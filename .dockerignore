@@ -1,0 +1,15 @@
+.git
+.gitignore
+.claude
+.DS_Store
+documents/
+build/
+*.md
+scripts/
+coverage.out
+coverage/
+*.test
+.dockerignore
+Dockerfile
+compose.yaml
+.cache/

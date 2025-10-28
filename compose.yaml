@@ -1,0 +1,56 @@
+services:
+  test:
+    image: golang:1.25-alpine
+    working_dir: /usr/src/zerohalt
+    volumes:
+      - .:/usr/src/zerohalt
+      - ./build/cache/go/pkg/mod:/go/pkg/mod
+      - ./build/cache/go-build:/root/.cache/go-build
+    command: ["sh", "-c", "mkdir -p coverage/ && go test -v -coverprofile=coverage/coverage.out ./...; go tool cover -html=coverage/coverage.out -o coverage/coverage.html"]
+
+  format:
+    image: golang:1.25-alpine
+    working_dir: /usr/src/zerohalt
+    volumes:
+      - .:/usr/src/zerohalt
+      - ./build/cache/go/pkg/mod:/go/pkg/mod
+      - ./build/cache/go-build:/root/.cache/go-build
+    command:
+      - sh
+      - -c
+      - "gofmt -l .; gofmt -w ."
+
+  build:
+    image: golang:1.25-alpine
+    working_dir: /usr/src/zerohalt
+    volumes:
+      - .:/usr/src/zerohalt
+      - ./build/cache/go/pkg/mod:/go/pkg/mod
+      - ./build/cache/go-build:/root/.cache/go-build
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=${TARGET_OS:-linux}
+      - GOARCH=${TARGET_ARCH:-amd64}
+    command: >
+      go build
+        -ldflags="-s -w"
+        -o "build/zerohalt-${TARGET_OS:-linux}-${TARGET_ARCH:-amd64}"
+        ./cmd/zerohalt
+
+  golang:
+    image: golang:1.25-alpine
+    working_dir: /usr/src/zerohalt
+    volumes:
+      - .:/usr/src/zerohalt
+      - ./build/cache/go/pkg/mod:/go/pkg/mod
+      - ./build/cache/go-build:/root/.cache/go-build
+
+  app:
+    build: .
+    ports:
+      - "8080:80"
+      - "8888:8888"
+    environment:
+      - ZEROHALT_LOG_LEVEL=debug
+      - ZEROHALT_APP_PORT=80
+      - ZEROHALT_HEALTH_PORT=8888
