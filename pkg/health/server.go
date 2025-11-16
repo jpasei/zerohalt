@@ -25,17 +25,23 @@ import (
 )
 
 type Server struct {
-	port   uint16
-	path   string
-	state  *State
-	server *http.Server
+	port       uint16
+	path       string
+	state      *State
+	server     *http.Server
+	appChecker *AppHealthChecker
 }
 
 func NewServer(port uint16, path string) *Server {
+	return NewServerWithAppChecker(port, path, nil)
+}
+
+func NewServerWithAppChecker(port uint16, path string, appChecker *AppHealthChecker) *Server {
 	s := &Server{
-		port:  port,
-		path:  path,
-		state: NewState(),
+		port:       port,
+		path:       path,
+		state:      NewState(),
+		appChecker: appChecker,
 	}
 
 	mux := http.NewServeMux()
@@ -77,6 +83,15 @@ func (s *Server) GetState() HealthState {
 	return s.state.Get()
 }
 
+func (s *Server) WaitForAppHealthy(startupTimeout time.Duration, checkInterval time.Duration) bool {
+	if s.appChecker == nil {
+		slog.Debug("No app health checker configured, skipping app health wait")
+		return true
+	}
+
+	return s.appChecker.WaitForHealthy(startupTimeout, checkInterval)
+}
+
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	defer func() {
@@ -91,11 +106,35 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch state {
 	case StateHealthy:
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy"}`))
+		if s.appChecker != nil {
+			if s.appChecker.Check() {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"status":"healthy"}`))
+			} else {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				w.Write([]byte(`{"status":"unhealthy"}`))
+			}
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"healthy"}`))
+		}
 	case StateStarting:
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte(`{"status":"starting"}`))
+	case StateUnhealthy:
+		if s.appChecker != nil {
+			if s.appChecker.Check() {
+				s.SetState(StateHealthy)
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"status":"healthy"}`))
+			} else {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				w.Write([]byte(`{"status":"unhealthy"}`))
+			}
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"unhealthy"}`))
+		}
 	case StateDraining:
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte(`{"status":"draining"}`))

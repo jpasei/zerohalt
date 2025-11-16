@@ -31,6 +31,8 @@ type Config interface {
 	GetAdditionalPorts() []uint16
 	GetHealthPort() uint16
 	GetHealthPath() string
+	GetAppStartupTimeout() time.Duration
+	GetHealthProbeInterval() time.Duration
 	GetShutdownConfig() ShutdownConfig
 	GetSignalConfig() SignalConfig
 	GetConnectionCheckInterval() interface{}
@@ -47,6 +49,7 @@ type HealthServer interface {
 	Start() error
 	SetState(state int)
 	GetState() int
+	WaitForAppHealthy(timeout time.Duration, interval time.Duration) bool
 }
 
 type ConnectionMonitor interface {
@@ -121,8 +124,17 @@ func (m *Manager) Run(
 		}
 	}()
 
-	m.healthServer.SetState(1)
-	slog.Info("Health check now returning 200 OK")
+	startupTimeout := m.config.GetAppStartupTimeout()
+	probeInterval := m.config.GetHealthProbeInterval()
+
+	healthy := m.healthServer.WaitForAppHealthy(startupTimeout, probeInterval)
+	if healthy {
+		m.healthServer.SetState(1)
+		slog.Info("Health check now returning 200 OK")
+	} else {
+		m.healthServer.SetState(2)
+		slog.Warn("Application did not become healthy within timeout, health endpoint will return 503 unhealthy")
+	}
 
 	signalConfig := m.config.GetSignalConfig()
 	signalHandler := NewSignalHandler(&signalConfig, m.app.Process)

@@ -29,6 +29,7 @@ func TestHealthState_String(t *testing.T) {
 	}{
 		{"StateStarting", StateStarting, "starting"},
 		{"StateHealthy", StateHealthy, "healthy"},
+		{"StateUnhealthy", StateUnhealthy, "unhealthy"},
 		{"StateDraining", StateDraining, "draining"},
 		{"StateTerminating", StateTerminating, "terminating"},
 		{"StateUnknown", HealthState(99), "unknown"},

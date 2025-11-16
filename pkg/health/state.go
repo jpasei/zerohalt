@@ -25,6 +25,7 @@ type HealthState int
 const (
 	StateStarting HealthState = iota
 	StateHealthy
+	StateUnhealthy
 	StateDraining
 	StateTerminating
 )
@@ -35,6 +36,8 @@ func (s HealthState) String() string {
 		return "starting"
 	case StateHealthy:
 		return "healthy"
+	case StateUnhealthy:
+		return "unhealthy"
 	case StateDraining:
 		return "draining"
 	case StateTerminating:

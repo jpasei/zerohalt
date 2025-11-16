@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jpasei/zerohalt/pkg/metrics"
 	"github.com/jpasei/zerohalt/pkg/config"
 	"github.com/jpasei/zerohalt/pkg/health"
+	"github.com/jpasei/zerohalt/pkg/metrics"
 	"github.com/jpasei/zerohalt/pkg/monitor"
 	"github.com/jpasei/zerohalt/pkg/process"
 	"github.com/jpasei/zerohalt/pkg/shutdown"
@@ -75,6 +75,14 @@ func (c *ConfigAdapter) GetConnectionCheckInterval() interface{} {
 	return c.Shutdown.ConnectionCheckInterval
 }
 
+func (c *ConfigAdapter) GetAppStartupTimeout() time.Duration {
+	return c.App.StartupTimeout
+}
+
+func (c *ConfigAdapter) GetHealthProbeInterval() time.Duration {
+	return c.Health.ProbeInterval
+}
+
 type ShutdownConfigAdapter struct {
 	*config.ShutdownConfig
 }
@@ -105,6 +113,10 @@ func (h *HealthServerAdapter) SetState(state int) {
 
 func (h *HealthServerAdapter) GetState() int {
 	return int(h.Server.GetState())
+}
+
+func (h *HealthServerAdapter) WaitForAppHealthy(timeout time.Duration, interval time.Duration) bool {
+	return h.Server.WaitForAppHealthy(timeout, interval)
 }
 
 type MonitorAdapter struct {
@@ -167,8 +179,18 @@ func run(args []string) int {
 
 	slog.Info("Application command", "command", cfg.App.Command)
 
-	healthServer := &HealthServerAdapter{
-		Server: health.NewServer(cfg.Health.Port, cfg.Health.Path),
+	var healthServer *HealthServerAdapter
+	if cfg.Health.Mode == config.HealthModeAppDependent {
+		appChecker := health.NewAppHealthChecker(cfg.App.HealthURL, cfg.Health.ProbeTimeout)
+		healthServer = &HealthServerAdapter{
+			Server: health.NewServerWithAppChecker(cfg.Health.Port, cfg.Health.Path, appChecker),
+		}
+		slog.Info("Health server created in app-dependent mode", "app_health_url", cfg.App.HealthURL)
+	} else {
+		healthServer = &HealthServerAdapter{
+			Server: health.NewServer(cfg.Health.Port, cfg.Health.Path),
+		}
+		slog.Info("Health server created in standalone mode")
 	}
 
 	if cfg.Metrics.Enabled {

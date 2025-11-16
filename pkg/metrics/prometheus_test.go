@@ -362,7 +362,7 @@ func TestHandler_ContentType(t *testing.T) {
 func TestResponseRecorder_Write(t *testing.T) {
 	rec := &responseRecorder{
 		ResponseWriter: httptest.NewRecorder(),
-		body:          &bytes.Buffer{},
+		body:           &bytes.Buffer{},
 	}
 
 	data := []byte("test data")

@@ -63,6 +63,14 @@ func (m *mockConfig) GetConnectionCheckInterval() interface{} {
 	return 1 * time.Second
 }
 
+func (m *mockConfig) GetAppStartupTimeout() time.Duration {
+	return 30 * time.Second
+}
+
+func (m *mockConfig) GetHealthProbeInterval() time.Duration {
+	return 1 * time.Second
+}
+
 type mockShutdownConfig struct{}
 
 func (m *mockShutdownConfig) GetDrainTimeout() interface{} {
@@ -82,8 +90,10 @@ func (m *mockShutdownConfig) GetForceKillAfterTimeout() bool {
 }
 
 type mockHealthServer struct {
-	started bool
-	state   int
+	started          bool
+	state            int
+	waitForAppCalled bool
+	waitForAppResult bool
 }
 
 func (m *mockHealthServer) Start() error {
@@ -97,6 +107,11 @@ func (m *mockHealthServer) SetState(state int) {
 
 func (m *mockHealthServer) GetState() int {
 	return m.state
+}
+
+func (m *mockHealthServer) WaitForAppHealthy(timeout time.Duration, interval time.Duration) bool {
+	m.waitForAppCalled = true
+	return true
 }
 
 type mockConnectionMonitor struct{}
@@ -186,6 +201,10 @@ func (m *mockHealthServerWithError) SetState(state int) {
 
 func (m *mockHealthServerWithError) GetState() int {
 	return m.state
+}
+
+func (m *mockHealthServerWithError) WaitForAppHealthy(timeout time.Duration, interval time.Duration) bool {
+	return true
 }
 
 func TestManager_Run_HealthServerStartError(t *testing.T) {
@@ -491,4 +510,90 @@ func TestManager_handleSignals_ActionIgnore(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("Test timed out")
 	}
+}
+
+func TestManager_ShouldWaitForAppHealthBeforeSettingHealthy(t *testing.T) {
+	config := &mockConfig{
+		command: []string{"sleep", "2"},
+		port:    8080,
+	}
+
+	manager := NewManager(config)
+
+	healthServer := &mockHealthServer{
+		waitForAppResult: true,
+	}
+	connMonitor := &mockConnectionMonitor{}
+	shutdownCoord := &mockShutdownCoordinator{}
+
+	go func() {
+		manager.Run(healthServer, connMonitor, shutdownCoord)
+	}()
+
+	t.Cleanup(func() {
+		manager.app.Process.Kill()
+	})
+
+	time.Sleep(200 * time.Millisecond)
+
+	assert.True(t, healthServer.started, "Health server should be started")
+	assert.True(t, healthServer.waitForAppCalled, "Manager MUST call WaitForAppHealthy before setting state to healthy in app-dependent mode")
+	assert.Equal(t, 1, healthServer.state, "State should be set to Healthy only AFTER app health is verified")
+}
+
+func TestManager_ShouldNotCrashWhenAppFailsToBecomeHealthy(t *testing.T) {
+	config := &mockConfig{
+		command: []string{"sleep", "10"},
+		port:    8080,
+	}
+
+	manager := NewManager(config)
+
+	healthServer := &mockHealthServerThatFailsHealthCheck{}
+	connMonitor := &mockConnectionMonitor{}
+	shutdownCoord := &mockShutdownCoordinator{}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- manager.Run(healthServer, connMonitor, shutdownCoord)
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+
+	assert.True(t, healthServer.started, "Health server should be started")
+	assert.True(t, healthServer.waitForAppCalled, "Manager should call WaitForAppHealthy")
+	assert.Equal(t, 2, healthServer.state, "State should be set to Unhealthy when app doesn't become healthy within timeout")
+	assert.NotNil(t, manager.app, "App process should still be running")
+	assert.NotNil(t, manager.app.Process, "App process should not be nil")
+
+	manager.app.Process.Kill()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+	}
+}
+
+type mockHealthServerThatFailsHealthCheck struct {
+	started          bool
+	state            int
+	waitForAppCalled bool
+}
+
+func (m *mockHealthServerThatFailsHealthCheck) Start() error {
+	m.started = true
+	return nil
+}
+
+func (m *mockHealthServerThatFailsHealthCheck) SetState(state int) {
+	m.state = state
+}
+
+func (m *mockHealthServerThatFailsHealthCheck) GetState() int {
+	return m.state
+}
+
+func (m *mockHealthServerThatFailsHealthCheck) WaitForAppHealthy(timeout time.Duration, interval time.Duration) bool {
+	m.waitForAppCalled = true
+	return false
 }

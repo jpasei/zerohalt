@@ -120,7 +120,7 @@ func Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &responseRecorder{
 			ResponseWriter: w,
-			body:          &bytes.Buffer{},
+			body:           &bytes.Buffer{},
 		}
 
 		baseHandler.ServeHTTP(rec, r)

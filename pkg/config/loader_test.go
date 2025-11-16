@@ -279,3 +279,61 @@ func TestLoadFromEnv_SignalToApp(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "SIGINT", cfg.Shutdown.SignalToApp)
 }
+
+func TestLoadFromEnv_HealthProbeInterval(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_HEALTH_PROBE_INTERVAL", "10s")
+	defer os.Clearenv()
+
+	cfg, err := LoadFromEnv()
+	assert.NoError(t, err)
+	assert.Equal(t, 10*time.Second, cfg.Health.ProbeInterval)
+}
+
+func TestLoadFromEnv_InvalidHealthProbeInterval(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_HEALTH_PROBE_INTERVAL", "invalid")
+	defer os.Clearenv()
+
+	_, err := LoadFromEnv()
+	assert.Error(t, err)
+}
+
+func TestLoadFromEnv_MetricsEnabled(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
+	defer os.Clearenv()
+
+	cfg, err := LoadFromEnv()
+	assert.NoError(t, err)
+	assert.True(t, cfg.Metrics.Enabled)
+}
+
+func TestLoadFromEnv_MetricsPort(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_METRICS_PORT", "9999")
+	defer os.Clearenv()
+
+	cfg, err := LoadFromEnv()
+	assert.NoError(t, err)
+	assert.Equal(t, uint16(9999), cfg.Metrics.Port)
+}
+
+func TestLoadFromEnv_MetricsPath(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_METRICS_PATH", "/custom-metrics")
+	defer os.Clearenv()
+
+	cfg, err := LoadFromEnv()
+	assert.NoError(t, err)
+	assert.Equal(t, "/custom-metrics", cfg.Metrics.Path)
+}
+
+func TestLoadFromEnv_InvalidMetricsPort(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_METRICS_PORT", "invalid")
+	defer os.Clearenv()
+
+	_, err := LoadFromEnv()
+	assert.Error(t, err)
+}

@@ -61,6 +61,14 @@ func LoadFromEnv() (*Config, error) {
 		cfg.Health.Mode = HealthMode(mode)
 	}
 
+	if interval := os.Getenv("ZEROHALT_HEALTH_PROBE_INTERVAL"); interval != "" {
+		parsed, err := time.ParseDuration(interval)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ZEROHALT_HEALTH_PROBE_INTERVAL: %w", err)
+		}
+		cfg.Health.ProbeInterval = parsed
+	}
+
 	if command := os.Getenv("ZEROHALT_HEALTH_COMMAND"); command != "" {
 		cfg.Health.Command = strings.Fields(command)
 	}

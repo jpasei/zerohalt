@@ -53,6 +53,10 @@ services:
       - "9090:9090"
     environment:
       - ZEROHALT_LOG_LEVEL=debug
+      - ZEROHALT_HEALTH_MODE=app-dependent
+      - ZEROHALT_APP_HEALTH_URL=http://127.0.0.1/health.txt
+      - ZEROHALT_APP_STARTUP_TIMEOUT=30s
+      - ZEROHALT_HEALTH_PROBE_INTERVAL=5s
       - ZEROHALT_APP_PORT=80
       - ZEROHALT_HEALTH_PORT=8888
       - ZEROHALT_METRICS_ENABLED=true
