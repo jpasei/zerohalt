@@ -27,15 +27,21 @@ var (
 )
 
 type Monitor struct {
-	ports    []uint16
-	interval time.Duration
+	ports           []uint16
+	interval        time.Duration
+	steadyStateWait time.Duration
 }
 
 func NewMonitor(ports []uint16, interval time.Duration) *Monitor {
 	return &Monitor{
-		ports:    ports,
-		interval: interval,
+		ports:           ports,
+		interval:        interval,
+		steadyStateWait: 0,
 	}
+}
+
+func (m *Monitor) SetSteadyStateWait(wait time.Duration) {
+	m.steadyStateWait = wait
 }
 
 func (m *Monitor) Start() {
@@ -91,7 +97,7 @@ func (m *Monitor) WaitForZeroConnections(timeout time.Duration) error {
 	}()
 
 	deadline := time.Now().Add(timeout)
-	slog.Info("Waiting for connections to drain", "timeout", timeout, "check_interval", m.interval)
+	slog.Info("Waiting for connections to drain", "timeout", timeout, "check_interval", m.interval, "steady_state_wait", m.steadyStateWait)
 
 	count, err := m.CountActiveConnections()
 	if err != nil {
@@ -99,7 +105,15 @@ func (m *Monitor) WaitForZeroConnections(timeout time.Duration) error {
 		return err
 	}
 
+	steadyStateEnabled := m.steadyStateWait > 0
+
 	if count == 0 {
+		shouldWaitForSteadyState := steadyStateEnabled
+
+		if shouldWaitForSteadyState {
+			return m.waitForSteadyState(deadline)
+		}
+
 		slog.Info("All connections drained successfully")
 		return nil
 	}
@@ -117,6 +131,12 @@ func (m *Monitor) WaitForZeroConnections(timeout time.Duration) error {
 			}
 
 			if count == 0 {
+				shouldWaitForSteadyState := steadyStateEnabled
+
+				if shouldWaitForSteadyState {
+					return m.waitForSteadyState(deadline)
+				}
+
 				slog.Info("All connections drained successfully")
 				return nil
 			}
@@ -127,6 +147,47 @@ func (m *Monitor) WaitForZeroConnections(timeout time.Duration) error {
 				slog.Warn("Connection drain timeout exceeded", "active_count", count, "timeout", timeout)
 				return ErrDrainTimeout
 			}
+		}
+	}
+}
+
+func (m *Monitor) waitForSteadyState(deadline time.Time) error {
+	steadyStateCheckInterval := 50 * time.Millisecond
+	slog.Info("Connections reached zero, starting steady state wait", "wait_duration", m.steadyStateWait, "check_interval", steadyStateCheckInterval)
+	steadyStateDeadline := time.Now().Add(m.steadyStateWait)
+
+	ticker := time.NewTicker(steadyStateCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			isAfterOverallDeadline := time.Now().After(deadline)
+
+			if isAfterOverallDeadline {
+				slog.Warn("Overall drain timeout exceeded during steady state wait")
+				return ErrDrainTimeout
+			}
+
+			count, err := m.CountActiveConnections()
+			if err != nil {
+				slog.Error("Error counting active connections during steady state wait", "error", err)
+				return err
+			}
+
+			if count > 0 {
+				slog.Info("Connections increased during steady state wait, resetting timer", "active_count", count)
+				return m.WaitForZeroConnections(time.Until(deadline))
+			}
+
+			isAfterSteadyStateDeadline := time.Now().After(steadyStateDeadline)
+
+			if isAfterSteadyStateDeadline {
+				slog.Info("Steady state wait completed, all connections drained successfully")
+				return nil
+			}
+
+			slog.Debug("Steady state wait in progress, connections still at zero")
 		}
 	}
 }

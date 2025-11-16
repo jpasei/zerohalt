@@ -264,6 +264,8 @@ func TestRun_SuccessfulExecution(t *testing.T) {
 	port := getAvailablePort()
 	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", port))
 	defer os.Unsetenv("ZEROHALT_HEALTH_PORT")
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "0")
+	defer os.Unsetenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT")
 
 	args := []string{"zerohalt", "sleep", "0.1"}
 
@@ -339,10 +341,12 @@ func TestRun_MetricsOnSamePortAsHealth(t *testing.T) {
 	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
 	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
 	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", healthPort))
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "0")
 	defer func() {
 		os.Unsetenv("ZEROHALT_HEALTH_PORT")
 		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
 		os.Unsetenv("ZEROHALT_METRICS_PORT")
+		os.Unsetenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT")
 	}()
 
 	args := []string{"zerohalt", "sleep", "0.1"}
@@ -377,10 +381,12 @@ func TestRun_MetricsOnDifferentPort(t *testing.T) {
 	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
 	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
 	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", metricsPort))
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "0")
 	defer func() {
 		os.Unsetenv("ZEROHALT_HEALTH_PORT")
 		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
 		os.Unsetenv("ZEROHALT_METRICS_PORT")
+		os.Unsetenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT")
 	}()
 
 	args := []string{"zerohalt", "sleep", "0.1"}
@@ -415,10 +421,12 @@ func TestRun_MetricsNotOnHealthPortWhenDifferentPortConfigured(t *testing.T) {
 	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
 	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
 	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", metricsPort))
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "0")
 	defer func() {
 		os.Unsetenv("ZEROHALT_HEALTH_PORT")
 		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
 		os.Unsetenv("ZEROHALT_METRICS_PORT")
+		os.Unsetenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT")
 	}()
 
 	args := []string{"zerohalt", "sleep", "0.1"}
@@ -455,12 +463,14 @@ func TestRun_AppDependentHealthMode(t *testing.T) {
 	os.Setenv("ZEROHALT_APP_HEALTH_URL", fmt.Sprintf("http://127.0.0.1:%d/health", appPort))
 	os.Setenv("ZEROHALT_APP_STARTUP_TIMEOUT", "1s")
 	os.Setenv("ZEROHALT_HEALTH_PROBE_INTERVAL", "100ms")
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "0")
 	defer func() {
 		os.Unsetenv("ZEROHALT_HEALTH_PORT")
 		os.Unsetenv("ZEROHALT_HEALTH_MODE")
 		os.Unsetenv("ZEROHALT_APP_HEALTH_URL")
 		os.Unsetenv("ZEROHALT_APP_STARTUP_TIMEOUT")
 		os.Unsetenv("ZEROHALT_HEALTH_PROBE_INTERVAL")
+		os.Unsetenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT")
 	}()
 
 	args := []string{"zerohalt", "sleep", "0.1"}
@@ -501,10 +511,12 @@ func TestRun_MetricsServerError(t *testing.T) {
 	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
 	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
 	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", metricsPort))
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "0")
 	defer func() {
 		os.Unsetenv("ZEROHALT_HEALTH_PORT")
 		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
 		os.Unsetenv("ZEROHALT_METRICS_PORT")
+		os.Unsetenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT")
 	}()
 
 	args := []string{"zerohalt", "sleep", "0.1"}

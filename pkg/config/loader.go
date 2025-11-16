@@ -83,6 +83,14 @@ func LoadFromEnv() (*Config, error) {
 		cfg.Shutdown.DrainTimeout = parsed
 	}
 
+	if wait := os.Getenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT"); wait != "" {
+		parsed, err := time.ParseDuration(wait)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ZEROHALT_DRAIN_STEADY_STATE_WAIT: %w", err)
+		}
+		cfg.Shutdown.DrainSteadyStateWait = parsed
+	}
+
 	if timeout := os.Getenv("ZEROHALT_SHUTDOWN_TIMEOUT"); timeout != "" {
 		parsed, err := time.ParseDuration(timeout)
 		if err != nil {

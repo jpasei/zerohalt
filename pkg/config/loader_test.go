@@ -337,3 +337,22 @@ func TestLoadFromEnv_InvalidMetricsPort(t *testing.T) {
 	_, err := LoadFromEnv()
 	assert.Error(t, err)
 }
+
+func TestLoadFromEnv_DrainSteadyStateWait(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "10s")
+	defer os.Clearenv()
+
+	cfg, err := LoadFromEnv()
+	assert.NoError(t, err)
+	assert.Equal(t, 10*time.Second, cfg.Shutdown.DrainSteadyStateWait)
+}
+
+func TestLoadFromEnv_InvalidDrainSteadyStateWait(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ZEROHALT_DRAIN_STEADY_STATE_WAIT", "invalid")
+	defer os.Clearenv()
+
+	_, err := LoadFromEnv()
+	assert.Error(t, err)
+}

@@ -56,6 +56,7 @@ const (
 
 type ShutdownConfig struct {
 	DrainTimeout            time.Duration
+	DrainSteadyStateWait    time.Duration
 	ShutdownTimeout         time.Duration
 	ConnectionCheckInterval time.Duration
 	SignalToApp             string
@@ -99,6 +100,7 @@ func DefaultConfig() *Config {
 		},
 		Shutdown: ShutdownConfig{
 			DrainTimeout:            60 * time.Second,
+			DrainSteadyStateWait:    5 * time.Second,
 			ShutdownTimeout:         30 * time.Second,
 			ConnectionCheckInterval: 1 * time.Second,
 			SignalToApp:             "",

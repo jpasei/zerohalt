@@ -314,26 +314,201 @@ func TestMonitor_WaitForZeroConnections_ErrorInTickerLoop(t *testing.T) {
 
 	origParseProcNetTCP := parseProcNetTCP
 	callIndex := 0
-	responses := []struct {
-		conns []Connection
-		err   error
-	}{
-		{[]Connection{{LocalPort: 8080, State: StateEstablished}}, nil},
-		{[]Connection{}, nil},
-		{[]Connection{{LocalPort: 8080, State: StateEstablished}}, nil},
-		{[]Connection{}, nil},
-		{nil, os.ErrPermission},
-	}
 	parseProcNetTCP = func(path string) ([]Connection, error) {
-		response := responses[callIndex]
 		callIndex++
-		return response.conns, response.err
+		atErrorPoint := callIndex == 7 || callIndex == 8
+
+		if atErrorPoint {
+			return nil, os.ErrPermission
+		}
+
+		return []Connection{{LocalPort: 8080, State: StateEstablished}}, nil
 	}
 	defer func() {
 		parseProcNetTCP = origParseProcNetTCP
 	}()
 
 	err := m.WaitForZeroConnections(200 * time.Millisecond)
+
+	assert.Error(t, err)
+	assert.Equal(t, os.ErrPermission, err)
+}
+
+func TestMonitor_SetSteadyStateWait(t *testing.T) {
+	m := NewMonitor([]uint16{8080}, 1*time.Second)
+	wait := 5 * time.Second
+
+	m.SetSteadyStateWait(wait)
+
+	assert.Equal(t, wait, m.steadyStateWait)
+}
+
+func TestMonitor_WaitForZeroConnections_SteadyStateDisabled(t *testing.T) {
+	m := &Monitor{
+		ports:           []uint16{8080},
+		interval:        30 * time.Millisecond,
+		steadyStateWait: 0,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	callIndex := 0
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		callIndex++
+		hasConnections := callIndex == 1 || callIndex == 2
+
+		if hasConnections {
+			return []Connection{{LocalPort: 8080, State: StateEstablished}}, nil
+		}
+
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(200 * time.Millisecond)
+
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, callIndex, 4)
+}
+
+func TestMonitor_WaitForZeroConnections_SteadyStateWaitSuccess(t *testing.T) {
+	m := &Monitor{
+		ports:           []uint16{8080},
+		interval:        20 * time.Millisecond,
+		steadyStateWait: 60 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	callIndex := 0
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		callIndex++
+		hasConnections := callIndex == 1 || callIndex == 2
+
+		if hasConnections {
+			return []Connection{{LocalPort: 8080, State: StateEstablished}}, nil
+		}
+
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(500 * time.Millisecond)
+
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, callIndex, 3)
+}
+
+func TestMonitor_WaitForZeroConnections_SteadyStateResetOnConnectionIncrease(t *testing.T) {
+	m := &Monitor{
+		ports:           []uint16{8080},
+		interval:        20 * time.Millisecond,
+		steadyStateWait: 60 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	callIndex := 0
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		callIndex++
+		hasConnectionsPhase1 := callIndex == 1 || callIndex == 2
+		hasConnectionsPhase2 := callIndex == 4 || callIndex == 5
+
+		if hasConnectionsPhase1 || hasConnectionsPhase2 {
+			return []Connection{{LocalPort: 8080, State: StateEstablished}}, nil
+		}
+
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(500 * time.Millisecond)
+
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, callIndex, 6)
+}
+
+func TestMonitor_WaitForZeroConnections_SteadyStateTimeoutDuringWait(t *testing.T) {
+	m := &Monitor{
+		ports:           []uint16{8080},
+		interval:        20 * time.Millisecond,
+		steadyStateWait: 100 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	callIndex := 0
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		callIndex++
+		hasConnections := callIndex == 1 || callIndex == 2
+
+		if hasConnections {
+			return []Connection{{LocalPort: 8080, State: StateEstablished}}, nil
+		}
+
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(80 * time.Millisecond)
+
+	assert.Equal(t, ErrDrainTimeout, err)
+}
+
+func TestMonitor_WaitForZeroConnections_SteadyStateImmediateZero(t *testing.T) {
+	m := &Monitor{
+		ports:           []uint16{8080},
+		interval:        20 * time.Millisecond,
+		steadyStateWait: 60 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(500 * time.Millisecond)
+
+	assert.NoError(t, err)
+}
+
+func TestMonitor_WaitForZeroConnections_SteadyStateErrorDuringWait(t *testing.T) {
+	m := &Monitor{
+		ports:           []uint16{8080},
+		interval:        20 * time.Millisecond,
+		steadyStateWait: 60 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	callIndex := 0
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		callIndex++
+		hasConnections := callIndex == 1 || callIndex == 2
+
+		if hasConnections {
+			return []Connection{{LocalPort: 8080, State: StateEstablished}}, nil
+		}
+
+		atSteadyStateErrorPoint := callIndex == 4
+
+		if atSteadyStateErrorPoint {
+			return nil, os.ErrPermission
+		}
+
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(500 * time.Millisecond)
 
 	assert.Error(t, err)
 	assert.Equal(t, os.ErrPermission, err)

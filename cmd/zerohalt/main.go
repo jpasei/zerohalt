@@ -259,8 +259,9 @@ func run(args []string) int {
 	connMonitor := &MonitorAdapter{
 		Monitor: monitor.NewMonitor(ports, cfg.Shutdown.ConnectionCheckInterval),
 	}
+	connMonitor.Monitor.SetSteadyStateWait(cfg.Shutdown.DrainSteadyStateWait)
 	connMonitor.Monitor.Start()
-	slog.Info("Connection monitoring started", "ports", ports, "interval", cfg.Shutdown.ConnectionCheckInterval)
+	slog.Info("Connection monitoring started", "ports", ports, "interval", cfg.Shutdown.ConnectionCheckInterval, "steady_state_wait", cfg.Shutdown.DrainSteadyStateWait)
 
 	configAdapter := &ConfigAdapter{Config: cfg}
 	manager := process.NewManager(configAdapter)
