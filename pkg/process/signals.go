@@ -19,6 +19,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/jpasei/zerohalt/pkg/metrics"
 )
 
 type SignalAction int
@@ -84,6 +86,8 @@ func (h *SignalHandler) Setup() chan os.Signal {
 }
 
 func (h *SignalHandler) Handle(sig os.Signal) SignalAction {
+	metrics.SignalsReceived.WithLabelValues(sig.String()).Inc()
+
 	switch {
 	case h.shutdownSignals[sig]:
 		return ActionShutdown
@@ -92,6 +96,7 @@ func (h *SignalHandler) Handle(sig os.Signal) SignalAction {
 		if err := h.appProcess.Signal(sig); err != nil {
 			slog.Error("Failed to forward signal to app", "signal", sig.String(), "error", err)
 		} else {
+			metrics.SignalsForwarded.WithLabelValues(sig.String()).Inc()
 			slog.Info("Forwarded signal to application", "signal", sig.String(), "pid", h.appProcess.Pid)
 		}
 		return ActionPassThrough

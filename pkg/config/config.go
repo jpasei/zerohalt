@@ -24,6 +24,7 @@ type Config struct {
 	Shutdown ShutdownConfig
 	Logging  LoggingConfig
 	Signal   SignalConfig
+	Metrics  MetricsConfig
 }
 
 type AppConfig struct {
@@ -74,6 +75,12 @@ type SignalConfig struct {
 	ShutdownSignals    []string
 }
 
+type MetricsConfig struct {
+	Enabled bool
+	Port    uint16
+	Path    string
+}
+
 func DefaultConfig() *Config {
 	return &Config{
 		App: AppConfig{
@@ -107,6 +114,11 @@ func DefaultConfig() *Config {
 		Signal: SignalConfig{
 			PassThroughSignals: []string{},
 			ShutdownSignals:    []string{"SIGTERM", "SIGINT"},
+		},
+		Metrics: MetricsConfig{
+			Enabled: false,
+			Port:    uint16(8888),
+			Path:    "/metrics",
 		},
 	}
 }

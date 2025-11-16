@@ -19,6 +19,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
+
+	"github.com/jpasei/zerohalt/pkg/metrics"
 )
 
 type Server struct {
@@ -46,6 +49,13 @@ func NewServer(port uint16, path string) *Server {
 	return s
 }
 
+// EnableMetrics adds the metrics endpoint to the health server
+func (s *Server) EnableMetrics(metricsPath string) {
+	mux := s.server.Handler.(*http.ServeMux)
+	mux.Handle(metricsPath, metrics.Handler())
+	slog.Info("Metrics endpoint enabled", "path", metricsPath, "port", s.port)
+}
+
 func (s *Server) Start() error {
 	go func() {
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -68,6 +78,13 @@ func (s *Server) GetState() HealthState {
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() {
+		metrics.HealthRequests.Inc()
+		duration := time.Since(start).Seconds() * 1000
+		metrics.HealthRequestDuration.Set(duration)
+	}()
+
 	state := s.GetState()
 
 	w.Header().Set("Content-Type", "application/json")

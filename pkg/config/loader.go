@@ -97,6 +97,22 @@ func LoadFromEnv() (*Config, error) {
 		cfg.Signal.ShutdownSignals = strings.Split(shutdown, ",")
 	}
 
+	if enabled := os.Getenv("ZEROHALT_METRICS_ENABLED"); enabled != "" {
+		cfg.Metrics.Enabled = enabled == "true" || enabled == "1"
+	}
+
+	if port := os.Getenv("ZEROHALT_METRICS_PORT"); port != "" {
+		parsed, err := strconv.ParseUint(port, 10, 16)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ZEROHALT_METRICS_PORT: %w", err)
+		}
+		cfg.Metrics.Port = uint16(parsed)
+	}
+
+	if path := os.Getenv("ZEROHALT_METRICS_PATH"); path != "" {
+		cfg.Metrics.Path = path
+	}
+
 	return cfg, cfg.Validate()
 }
 

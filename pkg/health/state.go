@@ -14,7 +14,11 @@
 
 package health
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/jpasei/zerohalt/pkg/metrics"
+)
 
 type HealthState int
 
@@ -55,6 +59,7 @@ func (s *State) Set(state HealthState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.current = state
+	metrics.State.Set(float64(state))
 }
 
 func (s *State) Get() HealthState {

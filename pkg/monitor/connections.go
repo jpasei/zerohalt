@@ -18,6 +18,8 @@ import (
 	"errors"
 	"log/slog"
 	"time"
+
+	"github.com/jpasei/zerohalt/pkg/metrics"
 )
 
 var (
@@ -58,12 +60,20 @@ func (m *Monitor) CountActiveConnections() (int, error) {
 		}
 	}
 
+	metrics.ActiveConnections.Set(float64(count))
 	slog.Debug("Active connections counted", "count", count, "monitored_ports", m.ports)
 
 	return count, nil
 }
 
 func (m *Monitor) WaitForZeroConnections(timeout time.Duration) error {
+	start := time.Now()
+	metrics.DrainPhaseActive.Set(1)
+	defer func() {
+		metrics.DrainPhaseActive.Set(0)
+		metrics.DrainDuration.Set(time.Since(start).Seconds())
+	}()
+
 	ticker := time.NewTicker(m.interval)
 	defer ticker.Stop()
 

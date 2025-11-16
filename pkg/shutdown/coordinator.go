@@ -20,6 +20,8 @@ import (
 	"os"
 	"syscall"
 	"time"
+
+	"github.com/jpasei/zerohalt/pkg/metrics"
 )
 
 var (
@@ -86,6 +88,7 @@ func (c *Coordinator) InitiateShutdown(sig os.Signal) error {
 	}
 
 	signal := c.getSignalForApp()
+	metrics.HealthApp.Set(0)
 	if err := c.appProcess.Signal(signal); err != nil {
 		slog.Error("Error sending signal to app", "error", err)
 	} else {

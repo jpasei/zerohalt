@@ -20,6 +20,9 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
+
+	"github.com/jpasei/zerohalt/pkg/metrics"
 )
 
 type Config interface {
@@ -106,6 +109,17 @@ func (m *Manager) Run(
 	slog.Info("Application started", "pid", m.app.Process.Pid)
 
 	m.shutdownCoord.SetAppProcess(m.app.Process)
+
+	metrics.HealthApp.Set(1)
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			metrics.AppUptime.Inc()
+		}
+	}()
 
 	m.healthServer.SetState(1)
 	slog.Info("Health check now returning 200 OK")

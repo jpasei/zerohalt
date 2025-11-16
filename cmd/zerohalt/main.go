@@ -17,10 +17,12 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/jpasei/zerohalt/pkg/metrics"
 	"github.com/jpasei/zerohalt/pkg/config"
 	"github.com/jpasei/zerohalt/pkg/health"
 	"github.com/jpasei/zerohalt/pkg/monitor"
@@ -167,6 +169,38 @@ func run(args []string) int {
 
 	healthServer := &HealthServerAdapter{
 		Server: health.NewServer(cfg.Health.Port, cfg.Health.Path),
+	}
+
+	if cfg.Metrics.Enabled {
+		if cfg.Metrics.Port == cfg.Health.Port {
+			healthServer.Server.EnableMetrics(cfg.Metrics.Path)
+			slog.Info("Metrics enabled on health server", "path", cfg.Metrics.Path, "port", cfg.Health.Port)
+		} else {
+			mux := http.NewServeMux()
+			mux.Handle(cfg.Metrics.Path, metrics.Handler())
+
+			metricsAddr := fmt.Sprintf(":%d", cfg.Metrics.Port)
+			metricsServer := &http.Server{
+				Addr:    metricsAddr,
+				Handler: mux,
+			}
+
+			go func() {
+				slog.Info("Starting metrics server", "path", cfg.Metrics.Path, "port", cfg.Metrics.Port)
+				if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					slog.Error("Metrics server error", "error", err)
+				}
+			}()
+		}
+
+		go func() {
+			ticker := time.NewTicker(1 * time.Second)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				metrics.Uptime.Inc()
+			}
+		}()
 	}
 
 	ports := []uint16{cfg.App.Port}

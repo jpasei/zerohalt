@@ -16,6 +16,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -329,5 +330,118 @@ func TestSetupLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			setupLogger(tt.level)
 		})
+	}
+}
+
+func TestRun_MetricsOnSamePortAsHealth(t *testing.T) {
+	os.Unsetenv("ZEROHALT_APP_PORT")
+	healthPort := getAvailablePort()
+	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
+	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
+	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", healthPort))
+	defer func() {
+		os.Unsetenv("ZEROHALT_HEALTH_PORT")
+		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
+		os.Unsetenv("ZEROHALT_METRICS_PORT")
+	}()
+
+	args := []string{"zerohalt", "sleep", "0.1"}
+
+	done := make(chan int)
+	go func() {
+		done <- run(args)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", healthPort))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	proc, err := os.FindProcess(os.Getpid())
+	assert.NoError(t, err)
+	proc.Signal(os.Interrupt)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out after 5 seconds")
+	}
+}
+
+func TestRun_MetricsOnDifferentPort(t *testing.T) {
+	os.Unsetenv("ZEROHALT_APP_PORT")
+	healthPort := getAvailablePort()
+	metricsPort := getAvailablePort()
+	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
+	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
+	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", metricsPort))
+	defer func() {
+		os.Unsetenv("ZEROHALT_HEALTH_PORT")
+		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
+		os.Unsetenv("ZEROHALT_METRICS_PORT")
+	}()
+
+	args := []string{"zerohalt", "sleep", "0.1"}
+
+	done := make(chan int)
+	go func() {
+		done <- run(args)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", metricsPort))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	proc, err := os.FindProcess(os.Getpid())
+	assert.NoError(t, err)
+	proc.Signal(os.Interrupt)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out after 5 seconds")
+	}
+}
+
+func TestRun_MetricsNotOnHealthPortWhenDifferentPortConfigured(t *testing.T) {
+	os.Unsetenv("ZEROHALT_APP_PORT")
+	healthPort := getAvailablePort()
+	metricsPort := getAvailablePort()
+	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
+	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
+	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", metricsPort))
+	defer func() {
+		os.Unsetenv("ZEROHALT_HEALTH_PORT")
+		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
+		os.Unsetenv("ZEROHALT_METRICS_PORT")
+	}()
+
+	args := []string{"zerohalt", "sleep", "0.1"}
+
+	done := make(chan int)
+	go func() {
+		done <- run(args)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", healthPort))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	resp.Body.Close()
+
+	proc, err := os.FindProcess(os.Getpid())
+	assert.NoError(t, err)
+	proc.Signal(os.Interrupt)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out after 5 seconds")
 	}
 }
