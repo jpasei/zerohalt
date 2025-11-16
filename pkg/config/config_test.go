@@ -83,7 +83,27 @@ func TestDefaultConfig_ShutdownSignalsLength(t *testing.T) {
 
 func TestDefaultSignalConfig_PassThroughSignalsLength(t *testing.T) {
 	cfg := DefaultSignalConfig()
-	assert.Len(t, cfg.PassThroughSignals, 0)
+	assert.Len(t, cfg.PassThroughSignals, 4)
+}
+
+func TestDefaultSignalConfig_PassThroughSignalsContainsSIGHUP(t *testing.T) {
+	cfg := DefaultSignalConfig()
+	assert.Contains(t, cfg.PassThroughSignals, "SIGHUP")
+}
+
+func TestDefaultSignalConfig_PassThroughSignalsContainsSIGUSR1(t *testing.T) {
+	cfg := DefaultSignalConfig()
+	assert.Contains(t, cfg.PassThroughSignals, "SIGUSR1")
+}
+
+func TestDefaultSignalConfig_PassThroughSignalsContainsSIGUSR2(t *testing.T) {
+	cfg := DefaultSignalConfig()
+	assert.Contains(t, cfg.PassThroughSignals, "SIGUSR2")
+}
+
+func TestDefaultSignalConfig_PassThroughSignalsContainsSIGWINCH(t *testing.T) {
+	cfg := DefaultSignalConfig()
+	assert.Contains(t, cfg.PassThroughSignals, "SIGWINCH")
 }
 
 func TestDefaultSignalConfig_ShutdownSignalsLength(t *testing.T) {

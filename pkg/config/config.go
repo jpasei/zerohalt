@@ -111,10 +111,7 @@ func DefaultConfig() *Config {
 			Level:            "info",
 			IncludeTimestamp: true,
 		},
-		Signal: SignalConfig{
-			PassThroughSignals: []string{},
-			ShutdownSignals:    []string{"SIGTERM", "SIGINT"},
-		},
+		Signal: DefaultSignalConfig(),
 		Metrics: MetricsConfig{
 			Enabled: false,
 			Port:    uint16(8888),
@@ -125,7 +122,7 @@ func DefaultConfig() *Config {
 
 func DefaultSignalConfig() SignalConfig {
 	return SignalConfig{
-		PassThroughSignals: []string{},
+		PassThroughSignals: []string{"SIGHUP", "SIGUSR1", "SIGUSR2", "SIGWINCH"},
 		ShutdownSignals:    []string{"SIGTERM", "SIGINT"},
 	}
 }
