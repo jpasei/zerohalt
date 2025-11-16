@@ -151,6 +151,62 @@ func setupLogger(level string) {
 	slog.SetDefault(slog.New(handler))
 }
 
+func setupMetrics(cfg *config.Config, healthServer *HealthServerAdapter) {
+	metricsOnSamePort := cfg.Metrics.Port == cfg.Health.Port
+
+	if metricsOnSamePort {
+		enableMetricsOnHealthServer(cfg, healthServer)
+		return
+	}
+
+	startSeparateMetricsServer(cfg)
+	startUptimeTracker()
+}
+
+func enableMetricsOnHealthServer(cfg *config.Config, healthServer *HealthServerAdapter) {
+	healthServer.Server.EnableMetrics(cfg.Metrics.Path)
+	slog.Info("Metrics enabled on health server", "path", cfg.Metrics.Path, "port", cfg.Health.Port)
+	startUptimeTracker()
+}
+
+func startSeparateMetricsServer(cfg *config.Config) {
+	mux := http.NewServeMux()
+	mux.Handle(cfg.Metrics.Path, metrics.Handler())
+
+	metricsAddr := fmt.Sprintf(":%d", cfg.Metrics.Port)
+	metricsServer := &http.Server{
+		Addr:    metricsAddr,
+		Handler: mux,
+	}
+
+	go runMetricsServer(metricsServer, cfg)
+}
+
+func runMetricsServer(server *http.Server, cfg *config.Config) {
+	slog.Info("Starting metrics server", "path", cfg.Metrics.Path, "port", cfg.Metrics.Port)
+	err := server.ListenAndServe()
+
+	isServerClosed := err == http.ErrServerClosed
+	if isServerClosed {
+		return
+	}
+
+	if err != nil {
+		slog.Error("Metrics server error", "error", err)
+	}
+}
+
+func startUptimeTracker() {
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			metrics.Uptime.Inc()
+		}
+	}()
+}
+
 func run(args []string) int {
 	if len(args) > 1 && args[1] == "--version" {
 		fmt.Printf("zerohalt version %s (commit: %s, built: %s)\n", Version, Commit, BuildTime)
@@ -194,35 +250,7 @@ func run(args []string) int {
 	}
 
 	if cfg.Metrics.Enabled {
-		if cfg.Metrics.Port == cfg.Health.Port {
-			healthServer.Server.EnableMetrics(cfg.Metrics.Path)
-			slog.Info("Metrics enabled on health server", "path", cfg.Metrics.Path, "port", cfg.Health.Port)
-		} else {
-			mux := http.NewServeMux()
-			mux.Handle(cfg.Metrics.Path, metrics.Handler())
-
-			metricsAddr := fmt.Sprintf(":%d", cfg.Metrics.Port)
-			metricsServer := &http.Server{
-				Addr:    metricsAddr,
-				Handler: mux,
-			}
-
-			go func() {
-				slog.Info("Starting metrics server", "path", cfg.Metrics.Path, "port", cfg.Metrics.Port)
-				if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					slog.Error("Metrics server error", "error", err)
-				}
-			}()
-		}
-
-		go func() {
-			ticker := time.NewTicker(1 * time.Second)
-			defer ticker.Stop()
-
-			for range ticker.C {
-				metrics.Uptime.Inc()
-			}
-		}()
+		setupMetrics(cfg, healthServer)
 	}
 
 	ports := []uint16{cfg.App.Port}

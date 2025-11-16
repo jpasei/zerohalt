@@ -529,3 +529,67 @@ func TestRun_MetricsServerError(t *testing.T) {
 		t.Fatal("Test timed out after 5 seconds")
 	}
 }
+
+func TestRunMetricsServer_ServerClosed(t *testing.T) {
+	metricsPort := getAvailablePort()
+	cfg := &config.Config{
+		Metrics: config.MetricsConfig{
+			Port: metricsPort,
+			Path: "/metrics",
+		},
+	}
+
+	server := &http.Server{
+		Addr: fmt.Sprintf(":%d", metricsPort),
+	}
+
+	done := make(chan bool)
+	go func() {
+		runMetricsServer(server, cfg)
+		done <- true
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	err := server.Close()
+	assert.NoError(t, err)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Test timed out waiting for server to close")
+	}
+}
+
+func TestRunMetricsServer_ListenError(t *testing.T) {
+	metricsPort := getAvailablePort()
+
+	blocker := &http.Server{
+		Addr: fmt.Sprintf(":%d", metricsPort),
+	}
+	go blocker.ListenAndServe()
+	time.Sleep(100 * time.Millisecond)
+	defer blocker.Close()
+
+	cfg := &config.Config{
+		Metrics: config.MetricsConfig{
+			Port: metricsPort,
+			Path: "/metrics",
+		},
+	}
+
+	server := &http.Server{
+		Addr: fmt.Sprintf(":%d", metricsPort),
+	}
+
+	done := make(chan bool)
+	go func() {
+		runMetricsServer(server, cfg)
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Test timed out waiting for server error")
+	}
+}
