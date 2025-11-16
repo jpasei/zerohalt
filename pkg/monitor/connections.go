@@ -38,6 +38,19 @@ func NewMonitor(ports []uint16, interval time.Duration) *Monitor {
 	}
 }
 
+func (m *Monitor) Start() {
+	go m.runMonitoringLoop()
+}
+
+func (m *Monitor) runMonitoringLoop() {
+	ticker := time.NewTicker(m.interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		m.CountActiveConnections()
+	}
+}
+
 func (m *Monitor) CountActiveConnections() (int, error) {
 	tcpConns, err := parseProcNetTCP("/proc/net/tcp")
 	if err != nil {

@@ -100,8 +100,13 @@ func TestCoordinator_getSignalForApp(t *testing.T) {
 		signal string
 		want   os.Signal
 	}{
-		{"SIGTERM", "SIGTERM", syscall.SIGTERM},
+		{"SIGHUP", "SIGHUP", syscall.SIGHUP},
 		{"SIGINT", "SIGINT", syscall.SIGINT},
+		{"SIGTERM", "SIGTERM", syscall.SIGTERM},
+		{"SIGUSR1", "SIGUSR1", syscall.SIGUSR1},
+		{"SIGUSR2", "SIGUSR2", syscall.SIGUSR2},
+		{"SIGWINCH", "SIGWINCH", syscall.SIGWINCH},
+		{"SIGQUIT", "SIGQUIT", syscall.SIGQUIT},
 		{"default", "UNKNOWN", syscall.SIGTERM},
 	}
 

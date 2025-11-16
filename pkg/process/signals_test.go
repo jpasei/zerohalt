@@ -58,7 +58,7 @@ func TestParseSignal_AllSignals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseSignal(tt.sig)
+			got := ParseSignal(tt.sig)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -69,7 +69,7 @@ func TestParseSignal_Invalid(t *testing.T) {
 
 	for _, sig := range tests {
 		t.Run(sig, func(t *testing.T) {
-			got := parseSignal(sig)
+			got := ParseSignal(sig)
 			assert.Nil(t, got)
 		})
 	}

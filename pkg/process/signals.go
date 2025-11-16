@@ -51,13 +51,13 @@ func NewSignalHandler(config *SignalConfig, appProcess *os.Process) *SignalHandl
 	}
 
 	for _, sigName := range config.PassThroughSignals {
-		if sig := parseSignal(sigName); sig != nil {
+		if sig := ParseSignal(sigName); sig != nil {
 			h.passThroughSignals[sig] = true
 		}
 	}
 
 	for _, sigName := range config.ShutdownSignals {
-		if sig := parseSignal(sigName); sig != nil {
+		if sig := ParseSignal(sigName); sig != nil {
 			h.shutdownSignals[sig] = true
 		}
 	}
@@ -117,23 +117,16 @@ func (h *SignalHandler) forwardSignalToApp(sig os.Signal) {
 	slog.Info("Forwarded signal to application", "signal", sig.String(), "pid", h.appProcess.Pid)
 }
 
-func parseSignal(name string) os.Signal {
-	switch name {
-	case "SIGHUP":
-		return syscall.SIGHUP
-	case "SIGINT":
-		return syscall.SIGINT
-	case "SIGTERM":
-		return syscall.SIGTERM
-	case "SIGUSR1":
-		return syscall.SIGUSR1
-	case "SIGUSR2":
-		return syscall.SIGUSR2
-	case "SIGWINCH":
-		return syscall.SIGWINCH
-	case "SIGQUIT":
-		return syscall.SIGQUIT
-	default:
-		return nil
-	}
+var signalMap = map[string]os.Signal{
+	"SIGHUP":   syscall.SIGHUP,
+	"SIGINT":   syscall.SIGINT,
+	"SIGTERM":  syscall.SIGTERM,
+	"SIGUSR1":  syscall.SIGUSR1,
+	"SIGUSR2":  syscall.SIGUSR2,
+	"SIGWINCH": syscall.SIGWINCH,
+	"SIGQUIT":  syscall.SIGQUIT,
+}
+
+func ParseSignal(name string) os.Signal {
+	return signalMap[name]
 }

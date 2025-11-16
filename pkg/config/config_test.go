@@ -78,7 +78,7 @@ func TestDefaultConfig_LoggingIncludeTimestamp(t *testing.T) {
 
 func TestDefaultConfig_ShutdownSignalsLength(t *testing.T) {
 	cfg := DefaultConfig()
-	assert.Len(t, cfg.Signal.ShutdownSignals, 2)
+	assert.Len(t, cfg.Signal.ShutdownSignals, 3)
 }
 
 func TestDefaultSignalConfig_PassThroughSignalsLength(t *testing.T) {
@@ -108,7 +108,7 @@ func TestDefaultSignalConfig_PassThroughSignalsContainsSIGWINCH(t *testing.T) {
 
 func TestDefaultSignalConfig_ShutdownSignalsLength(t *testing.T) {
 	cfg := DefaultSignalConfig()
-	assert.Len(t, cfg.ShutdownSignals, 2)
+	assert.Len(t, cfg.ShutdownSignals, 3)
 }
 
 func TestDefaultSignalConfig_ShutdownSignalFirst(t *testing.T) {
@@ -119,6 +119,11 @@ func TestDefaultSignalConfig_ShutdownSignalFirst(t *testing.T) {
 func TestDefaultSignalConfig_ShutdownSignalSecond(t *testing.T) {
 	cfg := DefaultSignalConfig()
 	assert.Equal(t, "SIGINT", cfg.ShutdownSignals[1])
+}
+
+func TestDefaultSignalConfig_ShutdownSignalThird(t *testing.T) {
+	cfg := DefaultSignalConfig()
+	assert.Equal(t, "SIGQUIT", cfg.ShutdownSignals[2])
 }
 
 func TestHealthModeStandalone(t *testing.T) {

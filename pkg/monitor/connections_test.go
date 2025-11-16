@@ -177,3 +177,26 @@ func TestMonitor_CountActiveConnections_WithEstablished(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 4, count)
 }
+
+func TestMonitor_Start(t *testing.T) {
+	m := &Monitor{
+		ports:    []uint16{8080},
+		interval: 50 * time.Millisecond,
+	}
+
+	callCount := 0
+	origParseProcNetTCP := parseProcNetTCP
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		callCount++
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	m.Start()
+
+	time.Sleep(120 * time.Millisecond)
+
+	assert.GreaterOrEqual(t, callCount, 2)
+}

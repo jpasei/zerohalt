@@ -231,6 +231,8 @@ func run(args []string) int {
 	connMonitor := &MonitorAdapter{
 		Monitor: monitor.NewMonitor(ports, cfg.Shutdown.ConnectionCheckInterval),
 	}
+	connMonitor.Monitor.Start()
+	slog.Info("Connection monitoring started", "ports", ports, "interval", cfg.Shutdown.ConnectionCheckInterval)
 
 	configAdapter := &ConfigAdapter{Config: cfg}
 	manager := process.NewManager(configAdapter)

@@ -445,3 +445,87 @@ func TestRun_MetricsNotOnHealthPortWhenDifferentPortConfigured(t *testing.T) {
 		t.Fatal("Test timed out after 5 seconds")
 	}
 }
+
+func TestRun_AppDependentHealthMode(t *testing.T) {
+	os.Unsetenv("ZEROHALT_APP_PORT")
+	healthPort := getAvailablePort()
+	appPort := getAvailablePort()
+	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
+	os.Setenv("ZEROHALT_HEALTH_MODE", "app-dependent")
+	os.Setenv("ZEROHALT_APP_HEALTH_URL", fmt.Sprintf("http://127.0.0.1:%d/health", appPort))
+	os.Setenv("ZEROHALT_APP_STARTUP_TIMEOUT", "1s")
+	os.Setenv("ZEROHALT_HEALTH_PROBE_INTERVAL", "100ms")
+	defer func() {
+		os.Unsetenv("ZEROHALT_HEALTH_PORT")
+		os.Unsetenv("ZEROHALT_HEALTH_MODE")
+		os.Unsetenv("ZEROHALT_APP_HEALTH_URL")
+		os.Unsetenv("ZEROHALT_APP_STARTUP_TIMEOUT")
+		os.Unsetenv("ZEROHALT_HEALTH_PROBE_INTERVAL")
+	}()
+
+	args := []string{"zerohalt", "sleep", "0.1"}
+
+	done := make(chan int)
+	go func() {
+		done <- run(args)
+	}()
+
+	go func() {
+		time.Sleep(2000 * time.Millisecond)
+		proc, err := os.FindProcess(os.Getpid())
+		if err == nil {
+			proc.Signal(os.Interrupt)
+		}
+	}()
+
+	select {
+	case exitCode := <-done:
+		assert.Equal(t, 0, exitCode)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out after 5 seconds")
+	}
+}
+
+func TestRun_MetricsServerError(t *testing.T) {
+	os.Unsetenv("ZEROHALT_APP_PORT")
+	healthPort := getAvailablePort()
+	metricsPort := getAvailablePort()
+
+	blocker := &http.Server{
+		Addr: fmt.Sprintf(":%d", metricsPort),
+	}
+	go blocker.ListenAndServe()
+	time.Sleep(100 * time.Millisecond)
+	defer blocker.Close()
+
+	os.Setenv("ZEROHALT_HEALTH_PORT", fmt.Sprintf("%d", healthPort))
+	os.Setenv("ZEROHALT_METRICS_ENABLED", "true")
+	os.Setenv("ZEROHALT_METRICS_PORT", fmt.Sprintf("%d", metricsPort))
+	defer func() {
+		os.Unsetenv("ZEROHALT_HEALTH_PORT")
+		os.Unsetenv("ZEROHALT_METRICS_ENABLED")
+		os.Unsetenv("ZEROHALT_METRICS_PORT")
+	}()
+
+	args := []string{"zerohalt", "sleep", "0.1"}
+
+	done := make(chan int)
+	go func() {
+		done <- run(args)
+	}()
+
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		proc, err := os.FindProcess(os.Getpid())
+		if err == nil {
+			proc.Signal(os.Interrupt)
+		}
+	}()
+
+	select {
+	case exitCode := <-done:
+		assert.Equal(t, 0, exitCode)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out after 5 seconds")
+	}
+}

@@ -169,7 +169,7 @@ func TestValidate_InvalidPassThroughSignal(t *testing.T) {
 
 func TestValidate_InvalidShutdownSignal(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Signal.ShutdownSignals = []string{"SIGUSR1"}
+	cfg.Signal.ShutdownSignals = []string{"INVALID_SIGNAL"}
 
 	err := cfg.Validate()
 	assert.Error(t, err)

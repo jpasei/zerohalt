@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jpasei/zerohalt/pkg/process"
 )
 
 func LoadFromEnv() (*Config, error) {
@@ -151,24 +153,14 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("shutdown timeout must be positive")
 	}
 
-	validSignals := map[string]bool{
-		"SIGHUP":   true,
-		"SIGINT":   true,
-		"SIGTERM":  true,
-		"SIGUSR1":  true,
-		"SIGUSR2":  true,
-		"SIGWINCH": true,
-		"SIGQUIT":  true,
-	}
-
 	for _, sig := range c.Signal.PassThroughSignals {
-		if !validSignals[sig] {
+		if process.ParseSignal(sig) == nil {
 			return fmt.Errorf("invalid pass-through signal: %s", sig)
 		}
 	}
 
 	for _, sig := range c.Signal.ShutdownSignals {
-		if sig != "SIGTERM" && sig != "SIGINT" {
+		if process.ParseSignal(sig) == nil {
 			return fmt.Errorf("invalid shutdown signal: %s", sig)
 		}
 	}

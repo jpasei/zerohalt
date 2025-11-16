@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/jpasei/zerohalt/pkg/metrics"
+	"github.com/jpasei/zerohalt/pkg/process"
 )
 
 var (
@@ -122,12 +123,9 @@ func (c *Coordinator) InitiateShutdown(sig os.Signal) error {
 }
 
 func (c *Coordinator) getSignalForApp() os.Signal {
-	switch c.config.SignalToApp {
-	case "SIGTERM":
-		return syscall.SIGTERM
-	case "SIGINT":
-		return syscall.SIGINT
-	default:
+	signal := process.ParseSignal(c.config.SignalToApp)
+	if signal == nil {
 		return syscall.SIGTERM
 	}
+	return signal
 }

@@ -124,6 +124,16 @@ func (m *Manager) Run(
 		}
 	}()
 
+	signalConfig := m.config.GetSignalConfig()
+	signalHandler := NewSignalHandler(&signalConfig, m.app.Process)
+	sigChan := signalHandler.Setup()
+	slog.Info("Signal handler initialized and ready")
+
+	shutdownChan := make(chan error, 1)
+	go func() {
+		shutdownChan <- m.handleSignals(sigChan, signalHandler)
+	}()
+
 	startupTimeout := m.config.GetAppStartupTimeout()
 	probeInterval := m.config.GetHealthProbeInterval()
 
@@ -136,11 +146,7 @@ func (m *Manager) Run(
 		slog.Warn("Application did not become healthy within timeout, health endpoint will return 503 unhealthy")
 	}
 
-	signalConfig := m.config.GetSignalConfig()
-	signalHandler := NewSignalHandler(&signalConfig, m.app.Process)
-	sigChan := signalHandler.Setup()
-
-	return m.handleSignals(sigChan, signalHandler)
+	return <-shutdownChan
 }
 
 func (m *Manager) handleSignals(sigChan chan os.Signal, signalHandler *SignalHandler) error {

@@ -51,6 +51,7 @@ services:
       - "8080:80"
       - "8888:8888"
       - "9090:9090"
+    stop_grace_period: 5m
     environment:
       - ZEROHALT_LOG_LEVEL=debug
       - ZEROHALT_HEALTH_MODE=app-dependent

@@ -123,6 +123,6 @@ func DefaultConfig() *Config {
 func DefaultSignalConfig() SignalConfig {
 	return SignalConfig{
 		PassThroughSignals: []string{"SIGHUP", "SIGUSR1", "SIGUSR2", "SIGWINCH"},
-		ShutdownSignals:    []string{"SIGTERM", "SIGINT"},
+		ShutdownSignals:    []string{"SIGTERM", "SIGINT", "SIGQUIT"},
 	}
 }
