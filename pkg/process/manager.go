@@ -137,16 +137,27 @@ func (m *Manager) Run(
 	startupTimeout := m.config.GetAppStartupTimeout()
 	probeInterval := m.config.GetHealthProbeInterval()
 
-	healthy := m.healthServer.WaitForAppHealthy(startupTimeout, probeInterval)
-	if healthy {
-		m.healthServer.SetState(1)
-		slog.Info("Health check now returning 200 OK")
-	} else {
-		m.healthServer.SetState(2)
-		slog.Warn("Application did not become healthy within timeout, health endpoint will return 503 unhealthy")
-	}
+	go m.waitForAppHealthy(startupTimeout, probeInterval)
 
 	return <-shutdownChan
+}
+
+func (m *Manager) waitForAppHealthy(startupTimeout time.Duration, probeInterval time.Duration) {
+	healthy := m.healthServer.WaitForAppHealthy(startupTimeout, probeInterval)
+
+	healthyState := 2
+	if healthy {
+		healthyState = 1
+	}
+
+	m.healthServer.SetState(healthyState)
+
+	if healthy {
+		slog.Info("Health check now returning 200 OK")
+		return
+	}
+
+	slog.Warn("Application did not become healthy within timeout, health endpoint will return 503 unhealthy")
 }
 
 func (m *Manager) handleSignals(sigChan chan os.Signal, signalHandler *SignalHandler) error {

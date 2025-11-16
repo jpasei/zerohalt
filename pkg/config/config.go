@@ -101,7 +101,7 @@ func DefaultConfig() *Config {
 			DrainTimeout:            60 * time.Second,
 			ShutdownTimeout:         30 * time.Second,
 			ConnectionCheckInterval: 1 * time.Second,
-			SignalToApp:             "SIGTERM",
+			SignalToApp:             "",
 			ForceKillAfterTimeout:   true,
 			DrainStrategy:           "connections",
 			ConnectionIdleThreshold: 30 * time.Second,

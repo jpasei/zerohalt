@@ -58,7 +58,7 @@ func TestDefaultConfig_ShutdownTimeout(t *testing.T) {
 
 func TestDefaultConfig_SignalToApp(t *testing.T) {
 	cfg := DefaultConfig()
-	assert.Equal(t, "SIGTERM", cfg.Shutdown.SignalToApp)
+	assert.Equal(t, "", cfg.Shutdown.SignalToApp)
 }
 
 func TestDefaultConfig_ForceKillAfterTimeout(t *testing.T) {

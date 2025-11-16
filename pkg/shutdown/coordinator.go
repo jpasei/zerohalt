@@ -88,12 +88,12 @@ func (c *Coordinator) InitiateShutdown(sig os.Signal) error {
 		return nil
 	}
 
-	signal := c.getSignalForApp()
+	signal := c.getSignalForApp(sig)
 	metrics.HealthApp.Set(0)
 	if err := c.appProcess.Signal(signal); err != nil {
 		slog.Error("Error sending signal to app", "error", err)
 	} else {
-		slog.Info("Sent signal to application", "signal", c.config.SignalToApp, "pid", c.appProcess.Pid)
+		slog.Info("Sent signal to application", "signal", signal.String(), "pid", c.appProcess.Pid)
 	}
 
 	done := make(chan error, 1)
@@ -122,10 +122,17 @@ func (c *Coordinator) InitiateShutdown(sig os.Signal) error {
 	}
 }
 
-func (c *Coordinator) getSignalForApp() os.Signal {
+func (c *Coordinator) getSignalForApp(receivedSignal os.Signal) os.Signal {
+	signalToAppIsEmpty := c.config.SignalToApp == ""
+
+	if signalToAppIsEmpty {
+		return receivedSignal
+	}
+
 	signal := process.ParseSignal(c.config.SignalToApp)
 	if signal == nil {
-		return syscall.SIGTERM
+		return receivedSignal
 	}
+
 	return signal
 }

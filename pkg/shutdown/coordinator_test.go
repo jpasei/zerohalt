@@ -96,18 +96,20 @@ func TestCoordinator_InitiateShutdown_DrainTimeout(t *testing.T) {
 
 func TestCoordinator_getSignalForApp(t *testing.T) {
 	tests := []struct {
-		name   string
-		signal string
-		want   os.Signal
+		name           string
+		signal         string
+		receivedSignal os.Signal
+		want           os.Signal
 	}{
-		{"SIGHUP", "SIGHUP", syscall.SIGHUP},
-		{"SIGINT", "SIGINT", syscall.SIGINT},
-		{"SIGTERM", "SIGTERM", syscall.SIGTERM},
-		{"SIGUSR1", "SIGUSR1", syscall.SIGUSR1},
-		{"SIGUSR2", "SIGUSR2", syscall.SIGUSR2},
-		{"SIGWINCH", "SIGWINCH", syscall.SIGWINCH},
-		{"SIGQUIT", "SIGQUIT", syscall.SIGQUIT},
-		{"default", "UNKNOWN", syscall.SIGTERM},
+		{"SIGHUP", "SIGHUP", syscall.SIGTERM, syscall.SIGHUP},
+		{"SIGINT", "SIGINT", syscall.SIGTERM, syscall.SIGINT},
+		{"SIGTERM", "SIGTERM", syscall.SIGQUIT, syscall.SIGTERM},
+		{"SIGUSR1", "SIGUSR1", syscall.SIGTERM, syscall.SIGUSR1},
+		{"SIGUSR2", "SIGUSR2", syscall.SIGTERM, syscall.SIGUSR2},
+		{"SIGWINCH", "SIGWINCH", syscall.SIGTERM, syscall.SIGWINCH},
+		{"SIGQUIT", "SIGQUIT", syscall.SIGTERM, syscall.SIGQUIT},
+		{"default", "UNKNOWN", syscall.SIGTERM, syscall.SIGTERM},
+		{"empty_forwards_received", "", syscall.SIGQUIT, syscall.SIGQUIT},
 	}
 
 	for _, tt := range tests {
@@ -115,7 +117,7 @@ func TestCoordinator_getSignalForApp(t *testing.T) {
 			cfg := &ShutdownConfig{SignalToApp: tt.signal}
 			coordinator := NewCoordinator(cfg, &mockHealthServer{}, &mockConnectionMonitor{}, nil)
 
-			got := coordinator.getSignalForApp()
+			got := coordinator.getSignalForApp(tt.receivedSignal)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -294,4 +296,46 @@ func TestCoordinator_InitiateShutdown_ForceKillOnTimeout(t *testing.T) {
 
 	assert.Equal(t, ErrShutdownTimeout, err)
 	assert.Equal(t, 2, healthServer.state)
+}
+
+func TestCoordinator_GetSignalForApp_ForwardsReceivedSignalByDefault(t *testing.T) {
+	cfg := &ShutdownConfig{
+		DrainTimeout:    100 * time.Millisecond,
+		ShutdownTimeout: 2 * time.Second,
+		SignalToApp:     "",
+	}
+
+	coordinator := NewCoordinator(cfg, nil, nil, nil)
+
+	signal := coordinator.getSignalForApp(syscall.SIGQUIT)
+
+	assert.Equal(t, syscall.SIGQUIT, signal)
+}
+
+func TestCoordinator_GetSignalForApp_OverridesWithConfiguredSignal(t *testing.T) {
+	cfg := &ShutdownConfig{
+		DrainTimeout:    100 * time.Millisecond,
+		ShutdownTimeout: 2 * time.Second,
+		SignalToApp:     "SIGUSR1",
+	}
+
+	coordinator := NewCoordinator(cfg, nil, nil, nil)
+
+	signal := coordinator.getSignalForApp(syscall.SIGQUIT)
+
+	assert.Equal(t, syscall.SIGUSR1, signal)
+}
+
+func TestCoordinator_GetSignalForApp_ForwardsReceivedSignalWhenInvalidConfigured(t *testing.T) {
+	cfg := &ShutdownConfig{
+		DrainTimeout:    100 * time.Millisecond,
+		ShutdownTimeout: 2 * time.Second,
+		SignalToApp:     "INVALID",
+	}
+
+	coordinator := NewCoordinator(cfg, nil, nil, nil)
+
+	signal := coordinator.getSignalForApp(syscall.SIGINT)
+
+	assert.Equal(t, syscall.SIGINT, signal)
 }

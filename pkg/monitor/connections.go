@@ -68,7 +68,10 @@ func (m *Monitor) CountActiveConnections() (int, error) {
 
 	count := 0
 	for _, conn := range allConns {
-		if m.isMonitoredPort(conn.LocalPort) && conn.State == StateEstablished {
+		isMonitored := m.isMonitoredPort(conn.LocalPort)
+		isActive := m.isActiveState(conn.State)
+
+		if isMonitored && isActive {
 			count++
 		}
 	}
@@ -87,11 +90,22 @@ func (m *Monitor) WaitForZeroConnections(timeout time.Duration) error {
 		metrics.DrainDuration.Set(time.Since(start).Seconds())
 	}()
 
-	ticker := time.NewTicker(m.interval)
-	defer ticker.Stop()
-
 	deadline := time.Now().Add(timeout)
 	slog.Info("Waiting for connections to drain", "timeout", timeout, "check_interval", m.interval)
+
+	count, err := m.CountActiveConnections()
+	if err != nil {
+		slog.Error("Error counting active connections", "error", err)
+		return err
+	}
+
+	if count == 0 {
+		slog.Info("All connections drained successfully")
+		return nil
+	}
+
+	ticker := time.NewTicker(m.interval)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -124,4 +138,27 @@ func (m *Monitor) isMonitoredPort(port uint16) bool {
 		}
 	}
 	return false
+}
+
+func (m *Monitor) isActiveState(state TCPState) bool {
+	switch state {
+	case StateEstablished:
+		return true
+	case StateSynSent:
+		return true
+	case StateSynRecv:
+		return true
+	case StateFinWait1:
+		return true
+	case StateFinWait2:
+		return true
+	case StateCloseWait:
+		return true
+	case StateClosing:
+		return true
+	case StateLastAck:
+		return true
+	default:
+		return false
+	}
 }

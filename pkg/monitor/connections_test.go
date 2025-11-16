@@ -65,11 +65,22 @@ func TestMonitor_CountActiveConnections(t *testing.T) {
 }
 
 func TestMonitor_WaitForZeroConnections_Immediate(t *testing.T) {
-	m := NewMonitor([]uint16{65535}, 50*time.Millisecond)
+	m := &Monitor{
+		ports:    []uint16{8080},
+		interval: 50 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		return []Connection{}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
 
 	err := m.WaitForZeroConnections(100 * time.Millisecond)
 
-	t.Skipf("WaitForZeroConnections() skipped: %v", err)
+	assert.NoError(t, err)
 }
 
 func TestMonitor_CountActiveConnections_FileNotFound(t *testing.T) {
@@ -199,4 +210,131 @@ func TestMonitor_Start(t *testing.T) {
 	time.Sleep(120 * time.Millisecond)
 
 	assert.GreaterOrEqual(t, callCount, 2)
+}
+
+func TestMonitor_WaitForZeroConnections_EventualSuccess(t *testing.T) {
+	m := &Monitor{
+		ports:    []uint16{8080},
+		interval: 30 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	callIndex := 0
+	responses := []struct {
+		conns []Connection
+		err   error
+	}{
+		{[]Connection{{LocalPort: 8080, State: StateEstablished}}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{{LocalPort: 8080, State: StateEstablished}}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{}, nil},
+	}
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		response := responses[callIndex]
+		callIndex++
+		return response.conns, response.err
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(200 * time.Millisecond)
+
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, callIndex, 4)
+}
+
+func TestMonitor_isActiveState(t *testing.T) {
+	m := NewMonitor([]uint16{8080}, 1*time.Second)
+
+	tests := []struct {
+		name  string
+		state TCPState
+		want  bool
+	}{
+		{"established", StateEstablished, true},
+		{"syn_sent", StateSynSent, true},
+		{"syn_recv", StateSynRecv, true},
+		{"fin_wait1", StateFinWait1, true},
+		{"fin_wait2", StateFinWait2, true},
+		{"close_wait", StateCloseWait, true},
+		{"closing", StateClosing, true},
+		{"last_ack", StateLastAck, true},
+		{"listen", StateListen, false},
+		{"time_wait", StateTimeWait, false},
+		{"close", StateClose, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.isActiveState(tt.state)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestMonitor_CountActiveConnections_WithMultipleStates(t *testing.T) {
+	m := &Monitor{
+		ports:    []uint16{8080},
+		interval: 1 * time.Second,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		return []Connection{
+			{LocalPort: 8080, State: StateEstablished},
+			{LocalPort: 8080, State: StateSynRecv},
+			{LocalPort: 8080, State: StateFinWait1},
+			{LocalPort: 8080, State: StateCloseWait},
+			{LocalPort: 8080, State: StateListen},
+			{LocalPort: 8080, State: StateTimeWait},
+			{LocalPort: 7070, State: StateEstablished},
+		}, nil
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	count, err := m.CountActiveConnections()
+	assert.NoError(t, err)
+	assert.Equal(t, 8, count)
+}
+
+func TestMonitor_WaitForZeroConnections_ErrorInTickerLoop(t *testing.T) {
+	m := &Monitor{
+		ports:    []uint16{8080},
+		interval: 30 * time.Millisecond,
+	}
+
+	origParseProcNetTCP := parseProcNetTCP
+	callIndex := 0
+	responses := []struct {
+		conns []Connection
+		err   error
+	}{
+		{[]Connection{{LocalPort: 8080, State: StateEstablished}}, nil},
+		{[]Connection{}, nil},
+		{[]Connection{{LocalPort: 8080, State: StateEstablished}}, nil},
+		{[]Connection{}, nil},
+		{nil, os.ErrPermission},
+	}
+	parseProcNetTCP = func(path string) ([]Connection, error) {
+		response := responses[callIndex]
+		callIndex++
+		return response.conns, response.err
+	}
+	defer func() {
+		parseProcNetTCP = origParseProcNetTCP
+	}()
+
+	err := m.WaitForZeroConnections(200 * time.Millisecond)
+
+	assert.Error(t, err)
+	assert.Equal(t, os.ErrPermission, err)
 }
