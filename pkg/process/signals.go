@@ -93,12 +93,7 @@ func (h *SignalHandler) Handle(sig os.Signal) SignalAction {
 		return ActionShutdown
 
 	case h.passThroughSignals[sig]:
-		if err := h.appProcess.Signal(sig); err != nil {
-			slog.Error("Failed to forward signal to app", "signal", sig.String(), "error", err)
-		} else {
-			metrics.SignalsForwarded.WithLabelValues(sig.String()).Inc()
-			slog.Info("Forwarded signal to application", "signal", sig.String(), "pid", h.appProcess.Pid)
-		}
+		h.forwardSignalToApp(sig)
 		return ActionPassThrough
 
 	case sig == syscall.SIGCHLD:
@@ -108,6 +103,18 @@ func (h *SignalHandler) Handle(sig os.Signal) SignalAction {
 		slog.Warn("Received unexpected signal", "signal", sig.String())
 		return ActionIgnore
 	}
+}
+
+func (h *SignalHandler) forwardSignalToApp(sig os.Signal) {
+	err := h.appProcess.Signal(sig)
+
+	if err != nil {
+		slog.Error("Failed to forward signal to app", "signal", sig.String(), "error", err)
+		return
+	}
+
+	metrics.SignalsForwarded.WithLabelValues(sig.String()).Inc()
+	slog.Info("Forwarded signal to application", "signal", sig.String(), "pid", h.appProcess.Pid)
 }
 
 func parseSignal(name string) os.Signal {

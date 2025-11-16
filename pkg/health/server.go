@@ -106,35 +106,12 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch state {
 	case StateHealthy:
-		if s.appChecker != nil {
-			if s.appChecker.Check() {
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"status":"healthy"}`))
-			} else {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				w.Write([]byte(`{"status":"unhealthy"}`))
-			}
-		} else {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"healthy"}`))
-		}
+		s.handleHealthyState(w)
 	case StateStarting:
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte(`{"status":"starting"}`))
 	case StateUnhealthy:
-		if s.appChecker != nil {
-			if s.appChecker.Check() {
-				s.SetState(StateHealthy)
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"status":"healthy"}`))
-			} else {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				w.Write([]byte(`{"status":"unhealthy"}`))
-			}
-		} else {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"status":"unhealthy"}`))
-		}
+		s.handleUnhealthyState(w)
 	case StateDraining:
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte(`{"status":"draining"}`))
@@ -145,4 +122,55 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"status":"unknown"}`))
 	}
+}
+
+func (s *Server) handleHealthyState(w http.ResponseWriter) {
+	hasAppChecker := s.appChecker != nil
+
+	if hasAppChecker {
+		s.writeHealthyStateWithAppCheck(w)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"healthy"}`))
+}
+
+func (s *Server) writeHealthyStateWithAppCheck(w http.ResponseWriter) {
+	appIsHealthy := s.appChecker.Check()
+
+	if appIsHealthy {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"healthy"}`))
+		return
+	}
+
+	w.WriteHeader(http.StatusServiceUnavailable)
+	w.Write([]byte(`{"status":"unhealthy"}`))
+}
+
+func (s *Server) handleUnhealthyState(w http.ResponseWriter) {
+	hasAppChecker := s.appChecker != nil
+
+	if hasAppChecker {
+		s.writeUnhealthyStateWithAppCheck(w)
+		return
+	}
+
+	w.WriteHeader(http.StatusServiceUnavailable)
+	w.Write([]byte(`{"status":"unhealthy"}`))
+}
+
+func (s *Server) writeUnhealthyStateWithAppCheck(w http.ResponseWriter) {
+	appIsHealthy := s.appChecker.Check()
+
+	if appIsHealthy {
+		s.SetState(StateHealthy)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"healthy"}`))
+		return
+	}
+
+	w.WriteHeader(http.StatusServiceUnavailable)
+	w.Write([]byte(`{"status":"unhealthy"}`))
 }
