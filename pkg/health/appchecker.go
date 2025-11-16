@@ -42,7 +42,7 @@ func NewAppHealthChecker(healthURL string, timeout time.Duration) *AppHealthChec
 func (a *AppHealthChecker) Check() bool {
 	if a.healthURL == "" {
 		slog.Warn("Health URL is empty")
-		metrics.HealthApp.Set(0)
+		metrics.HealthApp.Set(float64(StateUnhealthy))
 		return false
 	}
 
@@ -52,26 +52,26 @@ func (a *AppHealthChecker) Check() bool {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.healthURL, nil)
 	if err != nil {
 		slog.Error("Failed to create health check request", "url", a.healthURL, "error", err)
-		metrics.HealthApp.Set(0)
+		metrics.HealthApp.Set(float64(StateUnhealthy))
 		return false
 	}
 
 	resp, err := a.client.Do(req)
 	if err != nil {
 		slog.Error("Health check request failed", "url", a.healthURL, "error", err)
-		metrics.HealthApp.Set(0)
+		metrics.HealthApp.Set(float64(StateUnhealthy))
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		slog.Debug("App health check succeeded", "url", a.healthURL, "status", resp.StatusCode)
-		metrics.HealthApp.Set(1)
+		metrics.HealthApp.Set(float64(StateHealthy))
 		return true
 	}
 
 	slog.Error("App health check failed", "url", a.healthURL, "status", resp.StatusCode)
-	metrics.HealthApp.Set(0)
+	metrics.HealthApp.Set(float64(StateUnhealthy))
 	return false
 }
 

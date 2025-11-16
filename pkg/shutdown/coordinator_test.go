@@ -21,15 +21,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jpasei/zerohalt/pkg/health"
+	"github.com/jpasei/zerohalt/pkg/metrics"
 	"github.com/jpasei/zerohalt/pkg/monitor"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 )
 
 type mockHealthServer struct {
-	state int
+	state health.HealthState
 }
 
-func (m *mockHealthServer) SetState(state int) {
+func (m *mockHealthServer) SetState(state health.HealthState) {
 	m.state = state
 }
 
@@ -76,7 +79,7 @@ func TestCoordinator_InitiateShutdown_NoProcess(t *testing.T) {
 	err := coordinator.InitiateShutdown(syscall.SIGTERM)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 2, healthServer.state)
+	assert.Equal(t, health.StateDraining, healthServer.state)
 }
 
 func TestCoordinator_InitiateShutdown_DrainTimeout(t *testing.T) {
@@ -142,7 +145,7 @@ func TestCoordinator_InitiateShutdown_WithProcessCleanExit(t *testing.T) {
 	err = coordinator.InitiateShutdown(syscall.SIGTERM)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 2, healthServer.state)
+	assert.Equal(t, health.StateDraining, healthServer.state)
 }
 
 func TestCoordinator_InitiateShutdown_SignalError(t *testing.T) {
@@ -166,7 +169,7 @@ func TestCoordinator_InitiateShutdown_SignalError(t *testing.T) {
 	err = coordinator.InitiateShutdown(syscall.SIGTERM)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 2, healthServer.state)
+	assert.Equal(t, health.StateDraining, healthServer.state)
 }
 
 func TestCoordinator_InitiateShutdown_Timeout(t *testing.T) {
@@ -265,7 +268,7 @@ func TestCoordinator_InitiateShutdown_WaitReturnsNoChildError(t *testing.T) {
 	err = coordinator.InitiateShutdown(syscall.SIGTERM)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 2, healthServer.state)
+	assert.Equal(t, health.StateDraining, healthServer.state)
 }
 
 func TestCoordinator_InitiateShutdown_ForceKillOnTimeout(t *testing.T) {
@@ -295,7 +298,7 @@ func TestCoordinator_InitiateShutdown_ForceKillOnTimeout(t *testing.T) {
 	err = coordinator.InitiateShutdown(syscall.SIGTERM)
 
 	assert.Equal(t, ErrShutdownTimeout, err)
-	assert.Equal(t, 2, healthServer.state)
+	assert.Equal(t, health.StateDraining, healthServer.state)
 }
 
 func TestCoordinator_GetSignalForApp_ForwardsReceivedSignalByDefault(t *testing.T) {
@@ -338,4 +341,46 @@ func TestCoordinator_GetSignalForApp_ForwardsReceivedSignalWhenInvalidConfigured
 	signal := coordinator.getSignalForApp(syscall.SIGINT)
 
 	assert.Equal(t, syscall.SIGINT, signal)
+}
+
+func getMetricValue(gauge *dto.Metric) float64 {
+	return gauge.GetGauge().GetValue()
+}
+
+func TestCoordinator_InitiateShutdown_SetsHealthAppMetricToZeroImmediately(t *testing.T) {
+	cfg := &ShutdownConfig{
+		DrainTimeout:    1 * time.Second,
+		ShutdownTimeout: 1 * time.Second,
+	}
+
+	metrics.HealthApp.Set(float64(health.StateHealthy))
+
+	healthServer := &mockHealthServer{}
+	connMonitor := &mockConnectionMonitor{}
+	coordinator := NewCoordinator(cfg, healthServer, connMonitor, nil)
+
+	err := coordinator.InitiateShutdown(syscall.SIGTERM)
+
+	assert.NoError(t, err)
+
+	var metric dto.Metric
+	err = metrics.HealthApp.Write(&metric)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(health.StateDraining), getMetricValue(&metric))
+}
+
+func TestCoordinator_InitiateShutdown_SetsStateToDraining(t *testing.T) {
+	cfg := &ShutdownConfig{
+		DrainTimeout:    100 * time.Millisecond,
+		ShutdownTimeout: 1 * time.Second,
+	}
+
+	healthServer := &mockHealthServer{}
+	connMonitor := &mockConnectionMonitor{}
+	coordinator := NewCoordinator(cfg, healthServer, connMonitor, nil)
+
+	err := coordinator.InitiateShutdown(syscall.SIGTERM)
+
+	assert.NoError(t, err)
+	assert.Equal(t, health.StateDraining, healthServer.state)
 }

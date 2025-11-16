@@ -192,10 +192,10 @@ func TestHealthServerAdapter_SetState(t *testing.T) {
 		Server: health.NewServer(port, "/health"),
 	}
 
-	server.SetState(1)
+	server.SetState(health.StateHealthy)
 	state := server.GetState()
 
-	assert.Equal(t, 1, state)
+	assert.Equal(t, health.StateHealthy, state)
 }
 
 func TestHealthServerAdapter_GetState(t *testing.T) {
@@ -206,7 +206,7 @@ func TestHealthServerAdapter_GetState(t *testing.T) {
 
 	state := server.GetState()
 
-	assert.GreaterOrEqual(t, state, 0)
+	assert.GreaterOrEqual(t, state, health.StateStarting)
 }
 
 func TestMonitorAdapter_WaitForZeroConnections(t *testing.T) {

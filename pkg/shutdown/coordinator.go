@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jpasei/zerohalt/pkg/health"
 	"github.com/jpasei/zerohalt/pkg/metrics"
 	"github.com/jpasei/zerohalt/pkg/process"
 )
@@ -30,7 +31,7 @@ var (
 )
 
 type HealthServer interface {
-	SetState(state int)
+	SetState(state health.HealthState)
 }
 
 type ConnectionMonitor interface {
@@ -72,7 +73,8 @@ func (c *Coordinator) SetAppProcess(appProcess *os.Process) {
 func (c *Coordinator) InitiateShutdown(sig os.Signal) error {
 	slog.Info("Received signal, starting graceful shutdown", "signal", sig.String())
 
-	c.healthServer.SetState(2)
+	c.healthServer.SetState(health.StateDraining)
+	metrics.HealthApp.Set(float64(health.StateDraining))
 
 	slog.Info("Health check now returning 503")
 
@@ -89,7 +91,6 @@ func (c *Coordinator) InitiateShutdown(sig os.Signal) error {
 	}
 
 	signal := c.getSignalForApp(sig)
-	metrics.HealthApp.Set(0)
 	if err := c.appProcess.Signal(signal); err != nil {
 		slog.Error("Error sending signal to app", "error", err)
 	} else {

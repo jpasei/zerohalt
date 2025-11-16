@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jpasei/zerohalt/pkg/health"
 	"github.com/jpasei/zerohalt/pkg/metrics"
 )
 
@@ -47,8 +48,8 @@ type ShutdownConfig interface {
 
 type HealthServer interface {
 	Start() error
-	SetState(state int)
-	GetState() int
+	SetState(state health.HealthState)
+	GetState() health.HealthState
 	WaitForAppHealthy(timeout time.Duration, interval time.Duration) bool
 }
 
@@ -85,6 +86,8 @@ func (m *Manager) Run(
 	m.connMonitor = connMonitor
 	m.shutdownCoord = shutdownCoord
 
+	metrics.HealthApp.Set(float64(health.StateStarting))
+
 	if err := m.healthServer.Start(); err != nil {
 		return fmt.Errorf("failed to start health server: %w", err)
 	}
@@ -113,7 +116,7 @@ func (m *Manager) Run(
 
 	m.shutdownCoord.SetAppProcess(m.app.Process)
 
-	metrics.HealthApp.Set(1)
+	metrics.HealthApp.Set(float64(health.StateHealthy))
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
@@ -145,9 +148,9 @@ func (m *Manager) Run(
 func (m *Manager) waitForAppHealthy(startupTimeout time.Duration, probeInterval time.Duration) {
 	healthy := m.healthServer.WaitForAppHealthy(startupTimeout, probeInterval)
 
-	healthyState := 2
+	healthyState := health.StateUnhealthy
 	if healthy {
-		healthyState = 1
+		healthyState = health.StateHealthy
 	}
 
 	m.healthServer.SetState(healthyState)

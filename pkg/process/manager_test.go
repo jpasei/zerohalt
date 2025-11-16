@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jpasei/zerohalt/pkg/health"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -91,7 +92,7 @@ func (m *mockShutdownConfig) GetForceKillAfterTimeout() bool {
 
 type mockHealthServer struct {
 	started          bool
-	state            int
+	state            health.HealthState
 	waitForAppCalled bool
 	waitForAppResult bool
 }
@@ -101,11 +102,11 @@ func (m *mockHealthServer) Start() error {
 	return nil
 }
 
-func (m *mockHealthServer) SetState(state int) {
+func (m *mockHealthServer) SetState(state health.HealthState) {
 	m.state = state
 }
 
-func (m *mockHealthServer) GetState() int {
+func (m *mockHealthServer) GetState() health.HealthState {
 	return m.state
 }
 
@@ -188,18 +189,18 @@ func TestManager_Run_HealthServerStart(t *testing.T) {
 
 type mockHealthServerWithError struct {
 	started bool
-	state   int
+	state   health.HealthState
 }
 
 func (m *mockHealthServerWithError) Start() error {
 	return os.ErrPermission
 }
 
-func (m *mockHealthServerWithError) SetState(state int) {
+func (m *mockHealthServerWithError) SetState(state health.HealthState) {
 	m.state = state
 }
 
-func (m *mockHealthServerWithError) GetState() int {
+func (m *mockHealthServerWithError) GetState() health.HealthState {
 	return m.state
 }
 
@@ -538,7 +539,7 @@ func TestManager_ShouldWaitForAppHealthBeforeSettingHealthy(t *testing.T) {
 
 	assert.True(t, healthServer.started, "Health server should be started")
 	assert.True(t, healthServer.waitForAppCalled, "Manager MUST call WaitForAppHealthy before setting state to healthy in app-dependent mode")
-	assert.Equal(t, 1, healthServer.state, "State should be set to Healthy only AFTER app health is verified")
+	assert.Equal(t, health.StateHealthy, healthServer.state, "State should be set to Healthy only AFTER app health is verified")
 }
 
 func TestManager_ShouldNotCrashWhenAppFailsToBecomeHealthy(t *testing.T) {
@@ -562,7 +563,7 @@ func TestManager_ShouldNotCrashWhenAppFailsToBecomeHealthy(t *testing.T) {
 
 	assert.True(t, healthServer.started, "Health server should be started")
 	assert.True(t, healthServer.waitForAppCalled, "Manager should call WaitForAppHealthy")
-	assert.Equal(t, 2, healthServer.state, "State should be set to Unhealthy when app doesn't become healthy within timeout")
+	assert.Equal(t, health.StateUnhealthy, healthServer.state, "State should be set to Unhealthy when app doesn't become healthy within timeout")
 	assert.NotNil(t, manager.app, "App process should still be running")
 	assert.NotNil(t, manager.app.Process, "App process should not be nil")
 
@@ -576,7 +577,7 @@ func TestManager_ShouldNotCrashWhenAppFailsToBecomeHealthy(t *testing.T) {
 
 type mockHealthServerThatFailsHealthCheck struct {
 	started          bool
-	state            int
+	state            health.HealthState
 	waitForAppCalled bool
 }
 
@@ -585,11 +586,11 @@ func (m *mockHealthServerThatFailsHealthCheck) Start() error {
 	return nil
 }
 
-func (m *mockHealthServerThatFailsHealthCheck) SetState(state int) {
+func (m *mockHealthServerThatFailsHealthCheck) SetState(state health.HealthState) {
 	m.state = state
 }
 
-func (m *mockHealthServerThatFailsHealthCheck) GetState() int {
+func (m *mockHealthServerThatFailsHealthCheck) GetState() health.HealthState {
 	return m.state
 }
 

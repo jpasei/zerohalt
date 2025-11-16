@@ -15,6 +15,7 @@
 package health
 
 import (
+	"log/slog"
 	"sync"
 
 	"github.com/jpasei/zerohalt/pkg/metrics"
@@ -53,6 +54,7 @@ type State struct {
 }
 
 func NewState() *State {
+	metrics.State.Set(float64(StateStarting))
 	return &State{
 		current: StateStarting,
 	}
@@ -61,8 +63,27 @@ func NewState() *State {
 func (s *State) Set(state HealthState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	slog.Debug("State transition requested", "from", s.current.String(), "to", state.String())
+
+	currentIsTerminating := s.current == StateTerminating
+	if currentIsTerminating {
+		slog.Debug("Blocked: cannot transition from Terminating")
+		return
+	}
+
+	currentIsDraining := s.current == StateDraining
+	targetIsTerminating := state == StateTerminating
+	allowedDrainingTransition := currentIsDraining && targetIsTerminating
+
+	if currentIsDraining && !allowedDrainingTransition {
+		slog.Debug("Blocked: cannot transition from Draining except to Terminating")
+		return
+	}
+
 	s.current = state
 	metrics.State.Set(float64(state))
+	slog.Debug("State transition successful", "new_state", state.String())
 }
 
 func (s *State) Get() HealthState {

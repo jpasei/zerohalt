@@ -91,3 +91,66 @@ func TestState_ConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestState_CannotTransitionFromDraining(t *testing.T) {
+	s := NewState()
+
+	s.Set(StateDraining)
+	assert.Equal(t, StateDraining, s.Get())
+
+	s.Set(StateHealthy)
+	assert.Equal(t, StateDraining, s.Get())
+
+	s.Set(StateUnhealthy)
+	assert.Equal(t, StateDraining, s.Get())
+
+	s.Set(StateStarting)
+	assert.Equal(t, StateDraining, s.Get())
+}
+
+func TestState_CannotTransitionFromTerminating(t *testing.T) {
+	s := NewState()
+
+	s.Set(StateTerminating)
+	assert.Equal(t, StateTerminating, s.Get())
+
+	s.Set(StateHealthy)
+	assert.Equal(t, StateTerminating, s.Get())
+
+	s.Set(StateUnhealthy)
+	assert.Equal(t, StateTerminating, s.Get())
+
+	s.Set(StateDraining)
+	assert.Equal(t, StateTerminating, s.Get())
+}
+
+func TestState_CanTransitionToDrainingFromAnyState(t *testing.T) {
+	tests := []struct {
+		name      string
+		fromState HealthState
+	}{
+		{"from Starting", StateStarting},
+		{"from Healthy", StateHealthy},
+		{"from Unhealthy", StateUnhealthy},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewState()
+			s.Set(tt.fromState)
+
+			s.Set(StateDraining)
+			assert.Equal(t, StateDraining, s.Get())
+		})
+	}
+}
+
+func TestState_CanTransitionFromDrainingToTerminating(t *testing.T) {
+	s := NewState()
+
+	s.Set(StateDraining)
+	assert.Equal(t, StateDraining, s.Get())
+
+	s.Set(StateTerminating)
+	assert.Equal(t, StateTerminating, s.Get())
+}

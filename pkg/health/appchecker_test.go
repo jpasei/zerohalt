@@ -143,7 +143,7 @@ func TestAppHealthChecker_Check_SetsMetricsWhenHealthy(t *testing.T) {
 	result := checker.Check()
 
 	assert.True(t, result)
-	assert.Equal(t, float64(1), testutil.ToFloat64(metrics.HealthApp))
+	assert.Equal(t, float64(StateHealthy), testutil.ToFloat64(metrics.HealthApp))
 }
 
 func TestAppHealthChecker_Check_SetsMetricsWhenUnhealthy(t *testing.T) {
@@ -157,7 +157,7 @@ func TestAppHealthChecker_Check_SetsMetricsWhenUnhealthy(t *testing.T) {
 	result := checker.Check()
 
 	assert.False(t, result)
-	assert.Equal(t, float64(0), testutil.ToFloat64(metrics.HealthApp))
+	assert.Equal(t, float64(StateUnhealthy), testutil.ToFloat64(metrics.HealthApp))
 }
 
 func TestAppHealthChecker_Check_SetsMetricsToZeroOnError(t *testing.T) {
@@ -165,5 +165,5 @@ func TestAppHealthChecker_Check_SetsMetricsToZeroOnError(t *testing.T) {
 	result := checker.Check()
 
 	assert.False(t, result)
-	assert.Equal(t, float64(0), testutil.ToFloat64(metrics.HealthApp))
+	assert.Equal(t, float64(StateUnhealthy), testutil.ToFloat64(metrics.HealthApp))
 }

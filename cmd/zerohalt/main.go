@@ -107,12 +107,12 @@ type HealthServerAdapter struct {
 	*health.Server
 }
 
-func (h *HealthServerAdapter) SetState(state int) {
-	h.Server.SetState(health.HealthState(state))
+func (h *HealthServerAdapter) SetState(state health.HealthState) {
+	h.Server.SetState(state)
 }
 
-func (h *HealthServerAdapter) GetState() int {
-	return int(h.Server.GetState())
+func (h *HealthServerAdapter) GetState() health.HealthState {
+	return h.Server.GetState()
 }
 
 func (h *HealthServerAdapter) WaitForAppHealthy(timeout time.Duration, interval time.Duration) bool {

@@ -73,7 +73,7 @@ var (
 
 	HealthApp = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "zerohalt_health_app",
-		Help: "Application health check state (0=unhealthy, 1=healthy)",
+		Help: "Application health state (0=starting, 1=healthy, 2=unhealthy, 3=draining, 4=terminating)",
 	})
 
 	// Signal Metrics
