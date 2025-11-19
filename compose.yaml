@@ -6,7 +6,7 @@ services:
       - .:/usr/src/zerohalt
       - ./build/cache/go/pkg/mod:/go/pkg/mod
       - ./build/cache/go-build:/root/.cache/go-build
-    command: ["sh", "-c", "mkdir -p coverage/ && go test -v -coverprofile=coverage/coverage.out ./...; go tool cover -html=coverage/coverage.out -o coverage/coverage.html"]
+    command: ["sh", "-c", "mkdir -p coverage/ && go test -v -coverprofile=coverage/coverage.out ./cmd/... ./pkg/... && go tool cover -html=coverage/coverage.out -o coverage/coverage.html"]
 
   format:
     image: golang:${GO_VERSION:-1.25}-alpine
