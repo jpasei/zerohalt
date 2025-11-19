@@ -1,6 +1,6 @@
 services:
   test:
-    image: golang:1.25-alpine
+    image: golang:${GO_VERSION:-1.25}-alpine
     working_dir: /usr/src/zerohalt
     volumes:
       - .:/usr/src/zerohalt
@@ -9,7 +9,7 @@ services:
     command: ["sh", "-c", "mkdir -p coverage/ && go test -v -coverprofile=coverage/coverage.out ./...; go tool cover -html=coverage/coverage.out -o coverage/coverage.html"]
 
   format:
-    image: golang:1.25-alpine
+    image: golang:${GO_VERSION:-1.25}-alpine
     working_dir: /usr/src/zerohalt
     volumes:
       - .:/usr/src/zerohalt
@@ -21,7 +21,7 @@ services:
       - "gofmt -l .; gofmt -w ."
 
   build:
-    image: golang:1.25-alpine
+    image: golang:${GO_VERSION:-1.25}-alpine
     working_dir: /usr/src/zerohalt
     volumes:
       - .:/usr/src/zerohalt
@@ -38,7 +38,7 @@ services:
         ./cmd/zerohalt
 
   golang:
-    image: golang:1.25-alpine
+    image: golang:${GO_VERSION:-1.25}-alpine
     working_dir: /usr/src/zerohalt
     volumes:
       - .:/usr/src/zerohalt
@@ -46,7 +46,10 @@ services:
       - ./build/cache/go-build:/root/.cache/go-build
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        GO_VERSION: ${GO_VERSION:-1.25}
     ports:
       - "8080:80"
       - "8888:8888"
