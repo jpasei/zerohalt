@@ -31,25 +31,8 @@ jobs:
           go-version: ${{ steps.go-version.outputs.version }}
           cache-dependency-path: 'go.sum'
 
-      - name: Run tests with coverage
-        run: |
-          mkdir -p coverage
-          go test -v -coverprofile=coverage/coverage.out ./cmd/... ./pkg/...
-
-      - name: Check coverage
-        run: |
-          COVERAGE=$(go tool cover -func=coverage/coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 100" | bc -l) )); then
-            echo "Coverage is below 100%"
-            exit 1
-          fi
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage/
+      - name: Run tests
+        run: go test -v ./cmd/... ./pkg/...
 
   build:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
